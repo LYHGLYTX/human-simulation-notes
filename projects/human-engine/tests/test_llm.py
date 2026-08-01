@@ -51,8 +51,9 @@ class TestOpenAICompatLLM(unittest.TestCase):
             '"coping_potential": 0.2, "norm_violation": 0.0, "control": 0.3}')
         ev = A.Event(type="loss", text="你失去了工作", intensity=1.0)
         appr = self.llm.appraise(ev, default_persona(), State())
-        self.assertAlmostEqual(appr.novelty, 0.8)
-        self.assertAlmostEqual(appr.valence, 0.1)
+        # hybrid = (LLM + rule) / 2  — loss: rule novelty≈0.6(+noise), valence=-0.75
+        self.assertAlmostEqual(appr.novelty, (0.8 + 0.6) / 2, delta=0.06)
+        self.assertAlmostEqual(appr.valence, (0.1 + (-0.75)) / 2)
 
     @mock.patch("urllib.request.build_opener")
     def test_appraise_fallback_on_error(self, mock_builder):

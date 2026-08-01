@@ -3,6 +3,8 @@ timeline coherence, scenario expectations + psychometrics sanity."""
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# tests must never hit the real LLM: force MockLLM
+os.environ.pop("HE_API_KEY", None)
 
 import unittest
 

@@ -22,6 +22,23 @@ from .persona import Persona
 from .state import State
 
 
+def _load_dotenv(paths=(".env", "human_engine/.env")):
+    """Zero-dependency .env loader (setdefault: real env wins)."""
+    for p in paths:
+        if not os.path.exists(p):
+            continue
+        with open(p, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, _, v = line.partition("=")
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+_load_dotenv()
+
+
 @dataclass
 class Action:
     kind: str            # behavioral category
@@ -88,13 +105,14 @@ class OpenAICompatLLM(LLMClient):
 
     def __init__(self, api_key: str | None = None, base_url: str | None = None,
                  model: str | None = None, proxy: str | None = None,
-                 temperature: float = 0.4):
+                 temperature: float = 0.4, max_tokens: int = 1024):
         self.api_key = api_key or os.environ.get("HE_API_KEY", "")
         self.base_url = (base_url or os.environ.get("HE_BASE_URL")
                          or "https://api.openai.com/v1").rstrip("/")
         self.model = model or os.environ.get("HE_MODEL") or "gpt-4o-mini"
         self.proxy = proxy if proxy is not None else os.environ.get("HE_PROXY", "")
         self.temperature = temperature
+        self.max_tokens = max_tokens
 
     # ------------------------------------------------------------------
     def _chat(self, system: str, user: str) -> str:
@@ -106,6 +124,7 @@ class OpenAICompatLLM(LLMClient):
                 {"role": "user", "content": user},
             ],
             "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
             "response_format": {"type": "json_object"},
         }).encode()
         req = urllib.request.Request(
@@ -148,7 +167,11 @@ class OpenAICompatLLM(LLMClient):
 
     def appraise(self, event, persona: Persona, state: State) -> _appraisal.Appraisal:
         sysp = ("你是情绪评价模块（Scherer appraisal theory）。根据事件与状态，"
-                "输出六维评价的 JSON（全部 0-1，valence 0=极负面 1=极正面）。")
+                "输出六维评价的 JSON（全部 0-1）。"
+                "valence 锚点：0=极负面（被羞辱/被背叛/亲人离世），"
+                "0.5=中性，1=极正面（被深爱之人拥抱）。"
+                "norm_violation 指事件本身违背此人道德的程度（如被要求做坏事），"
+                "而不是'别人对我不好'。")
         user = (f"人格: {persona.summary_text()}\n"
                 f"当前: 应激{state.stress:.0f}/100 资源{state.resources:.0f}/100 "
                 f"情绪{state.emotion_label} 崩溃={'是' if state.crashed else '否'}\n"
@@ -157,16 +180,26 @@ class OpenAICompatLLM(LLMClient):
                 '"coping_potential":0-1,"norm_violation":0-1,"control":0-1}')
         try:
             d = self._extract_json(self._chat(sysp, user))
+            llm = _appraisal.Appraisal(
+                novelty=float(d.get("novelty", 0.3)),
+                valence=float(d.get("valence", 0.0)),
+                goal_relevance=float(d.get("goal_relevance", 0.3)),
+                coping_potential=float(d.get("coping_potential", 0.5)),
+                norm_violation=float(d.get("norm_violation", 0.0)),
+                control=float(d.get("control", 0.5)),
+                event_type=event.type, text=event.text)
         except Exception:
             # fall back to rule-based appraisal so the sim never hard-crashes
             return _appraisal.appraise(event, persona, state)
+        # hybrid: LLM provides semantic nuance, rules anchor the dynamics
+        rule = _appraisal.appraise(event, persona, state)
         return _appraisal.Appraisal(
-            novelty=float(d.get("novelty", 0.3)),
-            valence=float(d.get("valence", 0.0)),
-            goal_relevance=float(d.get("goal_relevance", 0.3)),
-            coping_potential=float(d.get("coping_potential", 0.5)),
-            norm_violation=float(d.get("norm_violation", 0.0)),
-            control=float(d.get("control", 0.5)),
+            novelty=(llm.novelty + rule.novelty) / 2,
+            valence=(llm.valence + rule.valence) / 2,
+            goal_relevance=(llm.goal_relevance + rule.goal_relevance) / 2,
+            coping_potential=(llm.coping_potential + rule.coping_potential) / 2,
+            norm_violation=(llm.norm_violation + rule.norm_violation) / 2,
+            control=(llm.control + rule.control) / 2,
             event_type=event.type, text=event.text)
 
     def generate(self, snapshot: dict, context: list, decision: dict) -> Action:
@@ -195,7 +228,10 @@ class OpenAICompatLLM(LLMClient):
 
 
 def make_llm() -> LLMClient:
-    """Auto-select: real LLM if HE_API_KEY set, else MockLLM."""
+    """Auto-select: real LLM if HE_API_KEY set, else MockLLM.
+    Set HE_DISABLE_LLM=1 to force MockLLM (e.g. for tests)."""
+    if os.environ.get("HE_DISABLE_LLM") == "1":
+        return MockLLM()
     if os.environ.get("HE_API_KEY"):
         return OpenAICompatLLM()
     return MockLLM()
