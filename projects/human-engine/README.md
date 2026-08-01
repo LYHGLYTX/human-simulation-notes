@@ -50,18 +50,34 @@ python -m unittest tests/test_engine.py  # 测试
   [t=60s] 情绪=anger(P-0.32 A+0.47 D-0.11) 应激=38/阈值79 资源=62 自控=63 阶段=alert
 ```
 
-## 当前能力（M1）
+## 🔌 接入真实 LLM（M3，OpenAI 兼容）
+
+无需改代码——引擎自动检测环境变量 `HE_API_KEY`：
+
+```bash
+export HE_API_KEY=sk-xxxx                 # 必填
+export HE_BASE_URL=https://api.openai.com/v1   # 或 DeepSeek / 硅基流动 / vLLM 等
+export HE_MODEL=gpt-4o-mini               # 按服务商选择
+export HE_PROXY=http://127.0.0.1:2080     # 外网 API 需要代理时设置；国内 API 可留空
+python -m human_engine.cli --demo         # 现在走真实 LLM
+```
+
+- **perceive**：LLM 做事件结构化（12 类事件）
+- **appraise**：LLM 按 Scherer 六维检查表输出评价（JSON），**失败自动降级为规则版**，模拟不会中断
+- **generate**：注入人格+状态+相关记忆+行为决策，生成第一人称反应
+- 未设置 `HE_API_KEY` 时自动用 MockLLM（离线可跑）
+
+## 当前能力（M1–M3）
 
 - ✅ 完整 8 步事件管线（感知→appraisal→情绪→应激→记忆→决策→行为→反馈）
 - ✅ ALMA 三层情绪动力学（人格→心境→情绪，PAD 弛豫）
-- ✅ 自传体记忆 + 遗忘曲线 + 心境一致性检索
-- ✅ 创伤通道（感官碎片 + 触发词闪回）
-- ✅ 崩溃触发 + 不可逆后果（阈值永久下降、异稳态磨损）
-- ✅ 越轨回路（冲动→规范对抗→道德脱离→内疚/羞耻）
-- ⏳ 真实 LLM 接入（OpenAI 兼容，M3）
+- ✅ 自传体记忆 + 遗忘曲线 + 心境一致性/反刍检索
+- ✅ 创伤通道：概率化闪回、回避预增、倾诉/直面处理（consolidate）
+- ✅ 崩溃触发 + 不可逆后果（阈值永久下降、异稳态磨损、习得性无助）
+- ✅ 越轨回路：冲动→规范对抗→道德脱离→内疚/羞耻；匿名机会因素
+- ✅ 真实 LLM 接入（OpenAI 兼容，可插拔+自动降级）
 
 ## 下一步（见 spec §7）
 
-- M2：创伤通道深化（闪回频率/处理/再巩固）
-- M3：接真实 LLM（appraisal 与生成）
-- M4/M5：游戏化 + 细致前端
+- 关系图（好感/信任/权力差）、睡眠-生理循环深化
+- 细致前端（M4/M5）与验证迭代（M6）

@@ -8,7 +8,7 @@ from .persona import Persona, default_persona
 from .state import State
 from .memory import Memory
 from . import emotion, stress, morality
-from .llm import LLMClient, MockLLM
+from .llm import LLMClient, MockLLM, make_llm
 from ._clamp import clamp
 
 
@@ -20,7 +20,7 @@ class Engine:
                  llm: LLMClient | None = None,
                  seed: int | None = None):
         self.persona = persona or default_persona()
-        self.llm = llm or MockLLM()
+        self.llm = llm or make_llm()
         self.rng = random.Random(seed)
         self.state = State(t=0.0)
         # init mood from personality attractor
@@ -111,6 +111,7 @@ class Engine:
 
         # 7. generate action
         snapshot = s.snapshot()
+        snapshot["persona_summary"] = self.persona.summary_text()
         context = [m.as_dict() for m in
                    self.memory.retrieve(raw, s, k=3, rng=self.rng)]
         if flashback and frag:
@@ -265,7 +266,9 @@ class Engine:
         # memory of the response
         self.memory.add_episodic(t=s.t, text=f"[应对] {behavior}", valence=p[0],
                                  arousal=abs(p[0]), importance=0.4)
-        action = self.llm.generate(s.snapshot(),
+        snapshot = s.snapshot()
+        snapshot["persona_summary"] = self.persona.summary_text()
+        action = self.llm.generate(snapshot,
                                    [m.as_dict() for m in
                                     self.memory.retrieve("", s, k=2, rng=self.rng)],
                                    {"behavior": behavior, "deviant": deviant})
