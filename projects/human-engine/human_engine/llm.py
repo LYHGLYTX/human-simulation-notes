@@ -174,6 +174,13 @@ class OpenAICompatLLM(LLMClient):
         etype = out.get("type", "neutral")
         if etype not in _appraisal.EVENT_TYPES:
             etype = "neutral"
+        # rule-based fallback: strong negative keywords (slurs/violence) win
+        # over an LLM that plays it safe and says "neutral"
+        rule = _appraisal.perceive(raw)
+        if etype == "neutral" and rule.type in (
+                "humiliation", "conflict", "threat", "betrayal",
+                "abandonment", "loss", "criticism", "rejection"):
+            etype = rule.type
         return _appraisal.Event(
             type=etype,
             intensity=max(0.0, min(1.0, float(out.get("intensity", 1.0)))),
@@ -207,15 +214,21 @@ class OpenAICompatLLM(LLMClient):
         except Exception:
             # fall back to rule-based appraisal so the sim never hard-crashes
             return _appraisal.appraise(event, persona, state)
-        # hybrid: LLM provides semantic nuance, rules anchor the dynamics
+        # hybrid: LLM provides semantic nuance, rules anchor the dynamics.
+        # rule-heavy, and even more so when the LLM whitewashes a clearly
+        # negative event (LLMs are systematically valence-neutral / safe)
         rule = _appraisal.appraise(event, persona, state)
+        w_rule = 0.6
+        if rule.valence < -0.3 and llm.valence > rule.valence + 0.3:
+            w_rule = 0.75
+        w_llm = 1.0 - w_rule
         return _appraisal.Appraisal(
-            novelty=(llm.novelty + rule.novelty) / 2,
-            valence=(llm.valence + rule.valence) / 2,
-            goal_relevance=(llm.goal_relevance + rule.goal_relevance) / 2,
-            coping_potential=(llm.coping_potential + rule.coping_potential) / 2,
-            norm_violation=(llm.norm_violation + rule.norm_violation) / 2,
-            control=(llm.control + rule.control) / 2,
+            novelty=(llm.novelty * w_llm + rule.novelty * w_rule),
+            valence=(llm.valence * w_llm + rule.valence * w_rule),
+            goal_relevance=(llm.goal_relevance * w_llm + rule.goal_relevance * w_rule),
+            coping_potential=(llm.coping_potential * w_llm + rule.coping_potential * w_rule),
+            norm_violation=(llm.norm_violation * w_llm + rule.norm_violation * w_rule),
+            control=(llm.control * w_llm + rule.control * w_rule),
             event_type=event.type, text=event.text)
 
     def generate(self, snapshot: dict, context: list, decision: dict) -> Action:

@@ -59,9 +59,9 @@ class Persona:
     def mood_attractor(self) -> tuple[float, float, float]:
         """ALMA: personality -> mood baseline in PAD space."""
         p = (self.extraversion * 0.5 + self.agreeableness * 0.3 - self.neuroticism * 0.5)
-        a = (self.extraversion * 0.3 + self.neuroticism * 0.4)
+        a = (self.extraversion * 0.2 + self.neuroticism * 0.25)
         d = (self.extraversion * 0.2 + self.openness * 0.15 - self.neuroticism * 0.15)
-        return _clamp(p, -0.5, 0.5), _clamp(a, -0.3, 0.5), _clamp(d, -0.4, 0.4)
+        return _clamp(p, -0.5, 0.5), _clamp(a, -0.3, 0.3), _clamp(d, -0.4, 0.4)
 
     def attachment_bias(self, event_type: str) -> float:
         """How strongly attachment-relevant events hit this persona."""

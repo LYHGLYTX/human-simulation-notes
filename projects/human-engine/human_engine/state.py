@@ -56,15 +56,16 @@ class State:
         """Relaxation dynamics (WASABI + ALMA), spec §3.1 step 1."""
         p, a, d = self.pad
         mp, ma, md = self.mood_pad
-        # emotion -> mood baseline (fast)
+        # emotion -> mood baseline (slow: emotion lasts minutes, ~6%/s)
+        # so a 60s tick only decays ~48% of the shock instead of erasing it
         self.pad = (
-            _clamp(p + (mp - p) * min(1.0, 0.08 * dt), -1, 1),
-            _clamp(a + (ma - a) * min(1.0, 0.10 * dt), -1, 1),
-            _clamp(d + (md - d) * min(1.0, 0.06 * dt), -1, 1),
+            _clamp(p + (mp - p) * min(1.0, 0.008 * dt), -1, 1),
+            _clamp(a + (ma - a) * min(1.0, 0.010 * dt), -1, 1),
+            _clamp(d + (md - d) * min(1.0, 0.006 * dt), -1, 1),
         )
-        # mood -> personality attractor (slow)
+        # mood -> personality attractor (very slow, hours)
         ap, aa, ad = persona.mood_attractor()
-        k = min(1.0, 0.002 * dt)
+        k = min(1.0, 0.0005 * dt)
         self.mood_pad = (
             _clamp(mp + (ap - mp) * k, -1, 1),
             _clamp(ma + (aa - ma) * k, -1, 1),

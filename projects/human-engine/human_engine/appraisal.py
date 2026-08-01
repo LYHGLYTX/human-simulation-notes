@@ -13,11 +13,11 @@ from .state import State
 
 # Event type table: type -> (valence, novelty, goal_relevance, keywords)
 EVENT_TYPES: dict[str, dict] = {
-    "praise":       {"valence": 0.65, "novelty": 0.3, "relevance": 0.4, "kw": ["夸", "赞", "表扬", "谢谢", "praise", "thank", "great job", "你真棒", "good", "道歉", "对不起", "抱歉", "sorry", "认错", "道歉信"]},
+    "praise":       {"valence": 0.65, "novelty": 0.3, "relevance": 0.4, "kw": ["夸", "赞", "表扬", "谢谢", "praise", "thank", "great job", "你真棒", "good", "道歉", "对不起", "抱歉", "sorry", "认错", "道歉信", "我爱你", "喜欢你", "在一起", "表白", "想你了", "抱抱"]},
     "success":      {"valence": 0.7,  "novelty": 0.3, "relevance": 0.6, "kw": ["成功", "赢了", "通过", "升职", "success", "won", "promotion", "考过", "录取"]},
-    "criticism":    {"valence": -0.4, "novelty": 0.3, "relevance": 0.5, "kw": ["批评", "指责", "挑剔", "criticism", "criticize", "你不行"]},
-    "rejection":    {"valence": -0.5, "novelty": 0.4, "relevance": 0.6, "kw": ["拒绝", "不行", "驳回", "没通过", "reject", "refuse", "denied", "没选上"]},
-    "conflict":     {"valence": -0.5, "novelty": 0.4, "relevance": 0.6, "kw": ["吵架", "冲突", "争执", "吵", "conflict", "argue", "fight", "骂"]},
+    "criticism":    {"valence": -0.4, "novelty": 0.3, "relevance": 0.5, "kw": ["批评", "指责", "挑剔", "criticism", "criticize", "你不行", "废物", "没用"]},
+    "rejection":    {"valence": -0.5, "novelty": 0.4, "relevance": 0.6, "kw": ["拒绝", "不行", "驳回", "没通过", "reject", "refuse", "denied", "没选上", "滚"]},
+    "conflict":     {"valence": -0.5, "novelty": 0.4, "relevance": 0.6, "kw": ["吵架", "冲突", "争执", "吵", "conflict", "argue", "fight", "骂", "草泥马", "傻逼", "混蛋", "妈的", "他妈的", "滚他妈的"]},
     "humiliation":  {"valence": -0.8, "novelty": 0.5, "relevance": 0.8, "kw": ["羞辱", "当众", "嘲笑", "丢人", "humiliate", "mock", "laugh at", "公开"]},
     "betrayal":     {"valence": -0.85, "novelty": 0.6, "relevance": 0.9, "kw": ["背叛", "骗", "出卖", "隐瞒", "betray", "cheat", "lie", "利用", "据为己有", "不还", "抢功", "在背后", "曝光", "泄露", "隐私"]},
     "abandonment":  {"valence": -0.9, "novelty": 0.5, "relevance": 0.95, "kw": ["分手", "离开我", "抛弃", "不要我", "abandon", "left me", "breakup", "离婚", "走了", "没人要", "没人记得", "累赘"]},
