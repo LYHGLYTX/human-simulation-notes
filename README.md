@@ -14,18 +14,21 @@ It is not a finished framework. It is a workbench: half-formed ideas, structured
 
 ```
 .
-├── notes/          # Structured research notes (behavior, cognition, persona, ethics)
-├── projects/       # Standalone projects & prototypes
-├── experiments/    # Small runnable experiments and benchmarks
-└── resources/      # Bookmark-worthy papers, tools, and references
+├── notes/          # 笔记：research/（按主题）+ periods/（按 年/月/日 的时期日志）
+│   ├── research/   #   主题研究笔记（emotion, memory, trauma, ethics…）
+│   └── periods/    #   时期日志（2026/08/01.md）
+├── projects/       # 模拟程序与原型（simulation programs & agents）
+├── experiments/    # 小实验与基准（quick experiments）
+└── resources/      # 参考资料（papers, books, tools）
 ```
 
-| Directory   | What lives here |
-|-------------|-----------------|
-| `notes/`    | Markdown notes on human simulation: behavioral patterns, cognitive modeling, emotion, memory, social interaction, and the ethical boundaries of simulating people |
-| `projects/` | Larger, self-contained projects with their own README and setup instructions |
+| Directory    | What lives here |
+|--------------|-----------------|
+| `notes/research/` | Topic-organized notes: theory, literature, design specs, architecture blueprints |
+| `notes/periods/`  | Time-ordered journal: `年/月/日` (e.g. `2026/08/01.md`) — daily thoughts & progress |
+| `projects/`  | Self-contained simulation programs with their own README |
 | `experiments/` | Minimal, reproducible experiments — quick hypotheses tested in code |
-| `resources/` | Curated links, papers, and tooling worth remembering |
+| `resources/` | Curated papers, books, tools, and references |
 
 ## Goals
 
