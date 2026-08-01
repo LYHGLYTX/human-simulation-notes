@@ -77,7 +77,27 @@ python -m human_engine.cli --demo         # 现在走真实 LLM
 - ✅ 越轨回路：冲动→规范对抗→道德脱离→内疚/羞耻；匿名机会因素
 - ✅ 真实 LLM 接入（OpenAI 兼容，可插拔+自动降级）
 
+## 🧪 验证（阶段 4：一致性 + 量表 + 场景库）
+
+```bash
+cd projects/human-engine
+python -m unittest discover -s tests   # 32 个测试
+```
+
+- **一致性**：同 seed 完全复现（确定性）；同事件 20 seeds 主行为占比 ≥60%（不漂移）；高神经质→更高应激、高 BAS→更高冲动（人格对比方向正确）；创伤史→同样背叛事件应激更高（时间线效应）
+- **场景库**（`human_engine/scenarios.py`）：日常/压力/创伤/极端四类，含理论预期断言（daily 不崩溃、extreme 必崩溃且阈值永久下降…）
+- **量表**（`human_engine/psychometrics.py`）：简化 PCL-5（PTSD）/PHQ-9（抑郁）/PANAS/STAI-S，从连续状态推导——多次崩溃后 PHQ-9 显著升高、创伤场景后 PCL-5 显著升高（研究用途，非诊断）
+
+```python
+from human_engine.engine import Engine
+from human_engine.scenarios import run_scenario
+from human_engine.psychometrics import full_report
+e = Engine(seed=1)
+run_scenario(e, "trauma")
+print(full_report(e))
+```
+
 ## 下一步（见 spec §7）
 
 - 关系图（好感/信任/权力差）、睡眠-生理循环深化
-- 细致前端（M4/M5）与验证迭代（M6）
+- 细致前端（M4/M5）、专家盲评（M6）

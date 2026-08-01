@@ -20,9 +20,9 @@ EVENT_TYPES: dict[str, dict] = {
     "conflict":     {"valence": -0.5, "novelty": 0.4, "relevance": 0.6, "kw": ["吵架", "冲突", "争执", "吵", "conflict", "argue", "fight", "骂"]},
     "humiliation":  {"valence": -0.8, "novelty": 0.5, "relevance": 0.8, "kw": ["羞辱", "当众", "嘲笑", "丢人", "humiliate", "mock", "laugh at", "公开"]},
     "betrayal":     {"valence": -0.85, "novelty": 0.6, "relevance": 0.9, "kw": ["背叛", "骗", "出卖", "隐瞒", "betray", "cheat", "lie", "利用", "据为己有", "不还", "抢功", "在背后", "曝光", "泄露", "隐私"]},
-    "abandonment":  {"valence": -0.9, "novelty": 0.5, "relevance": 0.95, "kw": ["分手", "离开我", "抛弃", "不要我", "abandon", "left me", "breakup", "离婚", "走了"]},
-    "loss":         {"valence": -0.75, "novelty": 0.6, "relevance": 0.8, "kw": ["去世", "死了", "失去", "破产", "失业", "loss", "died", "death", "fired", "失去工作", "重病"]},
-    "threat":       {"valence": -0.7, "novelty": 0.7, "relevance": 0.85, "kw": ["威胁", "恐吓", "打", "暴力", "threat", "violence", "杀", "刀"]},
+    "abandonment":  {"valence": -0.9, "novelty": 0.5, "relevance": 0.95, "kw": ["分手", "离开我", "抛弃", "不要我", "abandon", "left me", "breakup", "离婚", "走了", "没人要", "没人记得", "累赘"]},
+    "loss":         {"valence": -0.75, "novelty": 0.6, "relevance": 0.8, "kw": ["去世", "死了", "失去", "破产", "失业", "loss", "died", "death", "fired", "失去工作", "重病", "离世", "猝死"]},
+    "threat":       {"valence": -0.7, "novelty": 0.7, "relevance": 0.85, "kw": ["威胁", "恐吓", "打", "暴力", "threat", "violence", "杀", "刀", "囚禁", "虐待", "跟踪", "绑架"]},
     "help":         {"valence": 0.55, "novelty": 0.3, "relevance": 0.5, "kw": ["帮助", "支持", "陪", "帮", "help", "support", "照顾"]},
     "neutral":      {"valence": 0.0,  "novelty": 0.2, "relevance": 0.2, "kw": []},
 }
@@ -84,8 +84,10 @@ def appraise(event: Event, persona: Persona, state: State,
     relevance *= persona.attachment_bias(event.type)
     relevance = min(1.0, relevance)
 
-    # coping potential: high resources -> high; high stress -> low
-    coping = clamp01(0.5 + (state.resources - 50) / 200 - state.stress / 300)
+    # coping potential: high resources -> high; high stress -> low;
+    # hypervigilance lowers it (threat overestimation, Ehlers & Clark)
+    coping = clamp01(0.5 + (state.resources - 50) / 200 - state.stress / 300
+                     - state.vigilance * 0.15)
 
     # control: internal locus raises perceived control; freeze lowers
     control = clamp01(persona.locus * 0.6 + (1 - state.crashed) * 0.2

@@ -20,7 +20,10 @@ class Engine:
                  llm: LLMClient | None = None,
                  seed: int | None = None):
         self.persona = persona or default_persona()
+        self.rng = random.Random(seed)
         self.llm = llm or make_llm()
+        if isinstance(self.llm, MockLLM) and self.llm.rng is None:
+            self.llm.rng = self.rng  # share seeded rng for reproducibility
         self.rng = random.Random(seed)
         self.state = State(t=0.0)
         # init mood from personality attractor

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import re
 import urllib.request
 from dataclasses import dataclass
@@ -43,11 +44,14 @@ class LLMClient:
 class MockLLM(LLMClient):
     """Rule-based offline implementation (M1)."""
 
+    def __init__(self, rng: random.Random | None = None):
+        self.rng = rng
+
     def perceive(self, raw: str, persona: Persona) -> _appraisal.Event:
         return _appraisal.perceive(raw)
 
     def appraise(self, event, persona: Persona, state: State) -> _appraisal.Appraisal:
-        return _appraisal.appraise(event, persona, state)
+        return _appraisal.appraise(event, persona, state, rng=self.rng)
 
     def generate(self, snapshot: dict, context: list, decision: dict) -> Action:
         kind = decision.get("behavior", "neutral_act")
