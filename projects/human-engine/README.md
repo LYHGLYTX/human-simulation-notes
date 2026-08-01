@@ -28,8 +28,18 @@ cd projects/human-engine
 python -m human_engine.cli --demo        # 脚本演示场景
 python -m human_engine.cli               # 交互模式（输入事件，/help 看命令）
 python -m human_engine.cli --once "你被当众羞辱了"
+python -m human_engine.web               # 🎮 游戏化 Web UI → http://localhost:8000
 python -m unittest tests/test_engine.py  # 测试
 ```
+
+## 🎮 游戏化 Web UI（阶段 2，零依赖）
+
+浏览器打开 http://localhost:8000：
+
+- 左栏：角色状态——表情、情绪标签、压力/精力/资源/自控/冲动/内疚/羞耻状态条、PAD 三轴、心境基线、GAS 阶段
+- 右栏：给 TA 发事件 → TA 自动反应（气泡）→ **你选择 TA 的应对方式**（3–4 个选项，金色=引擎推荐；红色=越轨选项）
+- 选择后果即时生效：越轨可能带来内疚/羞耻，也可能习得性道德脱离；压力爆表 → 💥 崩溃横幅（阈值永久下降）
+- 支持：😴 睡觉（恢复资源）、↺ 重置、状态条 3s 自动刷新
 
 ## 交互示例
 

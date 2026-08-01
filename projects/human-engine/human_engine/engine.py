@@ -174,6 +174,92 @@ class Engine:
                 "disengagement": mech}
 
 
+    # ------------------------------------------------------------------
+    def act(self, behavior: str, pipeline: dict | None = None) -> dict:
+        """Execute a chosen behavior (game mode: player picks; spec §5.2).
+
+        Behavior consequences update state; deviant behaviors run the
+        morality aftermath loop (spec §3.3.3).
+        """
+        s = self.state
+        p = s.pad
+        effects = {
+            "confront":  {"resources": -5, "self_control": -5},
+            "avoid":     {"resources": -2},
+            "vent":      {"stress": -10, "resources": -8},
+            "seek_support": {"resources": 10, "stress": -8, "guilt": -0.1, "shame": -0.1},
+            "impulsive_attack": {"stress": -12, "vigilance": 0.05},
+            "impulsive_selfharm": {"stress": -15, "resources": -10, "depression": 0.05},
+            "freeze":    {},
+            "fight":     {"stress": -10, "resources": -5},
+            "dissociate": {"stress": -10},
+            "neutral_act": {"stress": -3},
+        }
+        eff = effects.get(behavior, {})
+
+        # catharsis: confronting while angry releases some stress
+        if behavior == "confront" and p[0] < -0.2 and p[1] > 0.3:
+            eff = {**eff, "stress": eff.get("stress", 0) - 8}
+        # avoidance doesn't resolve the stressor: mood sags slightly
+        if behavior == "avoid":
+            mp, ma, md = s.mood_pad
+            s.mood_pad = (clamp(mp - 0.02, -1, 1), ma, md)
+            s.vigilance = clamp(s.vigilance + 0.05, 0, 1)
+
+        s.stress = clamp(s.stress + eff.get("stress", 0), 0, 100)
+        s.resources = clamp(s.resources + eff.get("resources", 0), 0, 100)
+        s.self_control = clamp(s.self_control + eff.get("self_control", 0), 0, 100)
+        s.guilt = clamp(s.guilt + eff.get("guilt", 0), 0, 1)
+        s.shame = clamp(s.shame + eff.get("shame", 0), 0, 1)
+        s.vigilance = clamp(s.vigilance + eff.get("vigilance", 0), 0, 1)
+        s.depression_tendency = clamp(
+            s.depression_tendency + eff.get("depression", 0), 0, 1)
+
+        deviant = behavior in ("impulsive_attack", "impulsive_selfharm", "fight")
+        if deviant:
+            act_res = {"success": self.rng.random() < 0.7,
+                       "punished": self.rng.random() < 0.3}
+            morality.after_deviance(self.persona, s, act_res)
+        if behavior in ("impulsive_selfharm", "impulsive_attack"):
+            s.impulse = 0.3  # discharge
+
+        # memory of the response
+        self.memory.add_episodic(t=s.t, text=f"[应对] {behavior}", valence=p[0],
+                                 arousal=abs(p[0]), importance=0.4)
+        action = self.llm.generate(s.snapshot(),
+                                   [m.as_dict() for m in
+                                    self.memory.retrieve("", s, k=2, rng=self.rng)],
+                                   {"behavior": behavior, "deviant": deviant})
+        return {"behavior": behavior, "deviant": deviant, "action": action.text,
+                "effects": eff}
+
+    def options(self, pipeline: dict | None = None) -> list[dict]:
+        """Candidate behaviors for the player (game mode), with recommendation."""
+        s = self.state
+        if s.crashed:
+            return [{"kind": k, "recommended": k == s.crash_type}
+                    for k in dict.fromkeys([s.crash_type, "freeze"])]
+
+        base = ["confront", "avoid", "vent", "seek_support"]
+        if s.impulse > 0.55:
+            base.append("impulsive_attack")
+        if s.depression_tendency > 0.4:
+            base.append("impulsive_selfharm")
+        if s.emotion_label in ("calm", "neutral", "joy"):
+            base.insert(0, "neutral_act")
+
+        recommended = {
+            "anger": "confront", "fear": "avoid", "anxious": "avoid",
+            "sadness": "vent", "shame": "avoid", "distress": "vent",
+            "joy": "neutral_act", "calm": "neutral_act", "neutral": "neutral_act",
+        }.get(s.emotion_label, "neutral_act")
+
+        out = []
+        for k in dict.fromkeys(base):
+            out.append({"kind": k, "recommended": k == recommended})
+        return out
+
+
 def EVENT_KEYWORDS(etype: str) -> list[str]:
     from .appraisal import EVENT_TYPES
     return EVENT_TYPES.get(etype, {}).get("kw", [])

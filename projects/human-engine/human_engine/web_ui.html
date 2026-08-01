@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>human-engine · 模拟人生</title>
+<style>
+  :root { --bg:#12141a; --panel:#1b1e27; --line:#2a2f3d; --text:#e8eaf0;
+          --dim:#8b90a0; --ok:#4cd07d; --warn:#f0b23a; --bad:#f0574a; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text);
+         font-family:"PingFang SC","Microsoft YaHei",sans-serif; min-height:100vh; }
+  #app { max-width:1100px; margin:0 auto; padding:18px; display:grid;
+         grid-template-columns:340px 1fr; gap:16px; }
+  .panel { background:var(--panel); border:1px solid var(--line);
+           border-radius:14px; padding:16px; }
+  h2 { font-size:14px; color:var(--dim); margin-bottom:12px; letter-spacing:1px; }
+  /* ---- 左栏：角色面板 ---- */
+  #face { font-size:64px; text-align:center; line-height:1.1; }
+  #emotion-label { text-align:center; font-size:17px; margin-top:6px; }
+  .bars { margin-top:14px; }
+  .bar { margin-bottom:10px; }
+  .bar .lab { display:flex; justify-content:space-between; font-size:12px;
+              color:var(--dim); margin-bottom:3px; }
+  .bar .track { height:10px; background:#262b37; border-radius:6px; overflow:hidden; }
+  .bar .fill { height:100%; border-radius:6px; transition:width .5s ease; }
+  .moodline { font-size:11px; color:var(--dim); margin-top:8px; }
+  #persona { font-size:12px; color:var(--dim); white-space:pre-line; margin-top:10px; }
+  #crashed-banner { display:none; background:#3a1d1d; border:1px solid #7a3333;
+                    color:#ff9d93; padding:10px; border-radius:10px; margin-top:10px;
+                    font-size:13px; text-align:center; }
+  .btn { background:#2a3040; border:1px solid var(--line); color:var(--text);
+         border-radius:9px; padding:7px 12px; cursor:pointer; font-size:12px; }
+  .btn:hover { background:#333b52; }
+  .btn.danger { border-color:#7a3333; color:#ff9d93; }
+  /* ---- 右栏：事件流 ---- */
+  #input-row { display:flex; gap:8px; margin-bottom:14px; }
+  #event-input { flex:1; background:#0f1117; border:1px solid var(--line);
+                 color:var(--text); border-radius:10px; padding:10px 12px;
+                 font-size:14px; outline:none; }
+  #event-input:focus { border-color:#4a6cf7; }
+  #send-btn { background:#4a6cf7; border:none; color:#fff; border-radius:10px;
+              padding:0 18px; font-size:14px; cursor:pointer; }
+  #stream { display:flex; flex-direction:column; gap:12px; }
+  .card { background:#0f1117; border:1px solid var(--line); border-radius:12px;
+          padding:13px 15px; animation:pop .3s ease; }
+  @keyframes pop { from { opacity:0; transform:translateY(6px); } }
+  .card .meta { display:flex; gap:8px; align-items:center; margin-bottom:7px;
+                font-size:11px; color:var(--dim); }
+  .tag { padding:2px 9px; border-radius:20px; font-size:11px; }
+  .tag.neg { background:#3a1d22; color:#ff9d93; }
+  .tag.pos { background:#163522; color:#7fe0a3; }
+  .tag.neu { background:#26304a; color:#9db4ff; }
+  .card .ev { font-size:15px; }
+  .card .bubble { margin-top:9px; background:var(--panel); border-radius:10px;
+                  padding:9px 12px; font-size:14px; border-left:3px solid #4a6cf7; }
+  .card .bubble .who { font-size:11px; color:var(--dim); margin-bottom:3px; }
+  .options { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .opt { background:#1d2330; border:1px solid var(--line); color:var(--text);
+         border-radius:9px; padding:8px 13px; font-size:13px; cursor:pointer;
+         transition:all .15s; }
+  .opt:hover { border-color:#4a6cf7; transform:translateY(-1px); }
+  .opt.rec { border-color:#f0b23a; }
+  .opt.rec::after { content:" · 推荐"; color:#f0b23a; font-size:11px; }
+  .opt.danger { border-color:#7a3333; }
+  .flash { color:#ff8c7e; font-size:12px; margin-top:7px; }
+  .small { font-size:11px; color:var(--dim); }
+  #pad-bars { display:flex; gap:10px; margin-top:10px; }
+  #pad-bars .bar { flex:1; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- 左栏 -->
+  <div>
+    <div class="panel">
+      <h2>角色状态</h2>
+      <div id="face">😐</div>
+      <div id="emotion-label">平静</div>
+      <div class="bars" id="main-bars"></div>
+      <div id="pad-bars"></div>
+      <div class="moodline" id="mood-line"></div>
+      <div id="crashed-banner">💥 崩溃中（<span id="crash-type"></span>）—— 阈值已永久下降</div>
+      <div style="margin-top:12px; display:flex; gap:8px;">
+        <button class="btn" id="sleep-btn">😴 睡觉</button>
+        <button class="btn" id="reset-btn">↺ 重置</button>
+      </div>
+      <div id="persona"></div>
+    </div>
+  </div>
+  <!-- 右栏 -->
+  <div class="panel">
+    <h2>世界事件</h2>
+    <div id="input-row">
+      <input id="event-input" placeholder="给 TA 发一个事件…（例如：你被当众羞辱了 / 收到一封道歉信）">
+      <button id="send-btn">发送</button>
+    </div>
+    <div id="stream"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const EMOTION_FACE = { joy:"😊", calm:"😌", anger:"😠", fear:"😨", anxious:"😰",
+  sadness:"😢", shame:"😳", distress:"😣", neutral:"😐" };
+const EMOTION_CN = { joy:"快乐", calm:"平静", anger:"愤怒", fear:"恐惧", anxious:"焦虑",
+  sadness:"悲伤", shame:"羞耻", distress:"痛苦", neutral:"中性" };
+const OPTION_CN = { confront:"正面面对", avoid:"回避忍下", vent:"发泄情绪",
+  seek_support:"找人倾诉", impulsive_attack:"冲动反击", impulsive_selfharm:"伤害自己",
+  freeze:"僵住不动", fight:"彻底爆发", dissociate:"麻木抽离", neutral_act:"平静处理" };
+
+let pending = null;   // 待选择行为的事件卡片
+
+function bar(label, val, color, max=100){
+  const pct = Math.max(0, Math.min(100, val/max*100));
+  return `<div class="bar"><div class="lab"><span>${label}</span><span>${Math.round(val)}</span></div>
+          <div class="track"><div class="fill" style="width:${pct}%;background:${color}"></div></div></div>`;
+}
+
+function render(s){
+  $("face").textContent = EMOTION_FACE[s.emotion_label] || "😐";
+  $("emotion-label").textContent = (EMOTION_CN[s.emotion_label]||s.emotion_label)
+    + (s.crashed ? "（崩溃）" : "");
+  $("main-bars").innerHTML =
+    bar("压力", s.stress, s.stress>s.threshold?"#f0574a":s.stress>60?"#f0b23a":"#4a6cf7") +
+    bar("精力", s.energy, "#4cd07d") +
+    bar("应对资源", s.resources, s.resources<30?"#f0574a":"#37c6e0") +
+    bar("自控力", s.self_control, s.self_control<30?"#f0574a":"#b07ce0") +
+    bar("冲动", s.impulse*100, s.impulse>0.6?"#f0574a":"#8b90a0") +
+    bar("内疚", s.guilt*100, "#f0b23a") +
+    bar("羞耻", s.shame*100, "#f0b23a");
+  $("pad-bars").innerHTML =
+    bar("愉悦P", (s.pad[0]+1)*50, "#4cd07d") +
+    bar("唤醒A", (s.pad[1]+1)*50, "#f0b23a") +
+    bar("支配D", (s.pad[2]+1)*50, "#4a6cf7");
+  $("mood-line").textContent = `心境基线 P${(s.mood_pad[0]).toFixed(2)} A${(s.mood_pad[1]).toFixed(2)} D${(s.mood_pad[2]).toFixed(2)} · GAS阶段:${s.gas_phase} · 阈值:${Math.round(s.threshold)} · 磨损:${Math.round(s.wear)} · 警觉:${Math.round(s.vigilance*100)}%`;
+  $("persona").textContent = s.persona + "\n" + s.memory;
+  $("crashed-banner").style.display = s.crashed ? "block" : "none";
+  $("crash-type").textContent = s.crash_type;
+}
+
+function addCard(ev, type, cls){
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `<div class="meta"><span class="tag ${cls}">${type}</span>
+                    <span>t=${Math.round(ev.t||0)}s</span></div>
+                    <div class="ev"></div>`;
+  card.querySelector(".ev").textContent = ev.text || ev.raw || ev;
+  $("stream").prepend(card);
+  return card;
+}
+
+function bubble(card, who, text){
+  const b = document.createElement("div");
+  b.className = "bubble";
+  b.innerHTML = `<div class="who">${who}</div>${text}`;
+  card.appendChild(b);
+  return b;
+}
+
+function optionsUI(card, opts){
+  const box = document.createElement("div");
+  box.className = "options";
+  opts.forEach(o => {
+    const b = document.createElement("button");
+    b.className = "opt" + (o.recommended?" rec":"") +
+      (o.kind.startsWith("impulsive")||o.kind==="fight"?" danger":"");
+    b.textContent = OPTION_CN[o.kind] || o.kind;
+    b.onclick = () => act(o.kind);
+    box.appendChild(b);
+  });
+  card.appendChild(box);
+}
+
+async function api(path, body){
+  const r = await fetch(path, { method:"POST",
+    headers:{"Content-Type":"application/json"}, body: JSON.stringify(body||{}) });
+  return r.json();
+}
+
+async function sendEvent(){
+  const text = $("event-input").value.trim();
+  if(!text) return;
+  $("event-input").value = "";
+  const out = await api("/api/event", { text });
+  render(out.state);
+  const card = addCard(out, out.event_type,
+    out.appraisal.valence>0.3?"pos":out.appraisal.valence<-0.3?"neg":"neu");
+  if(out.flashback){
+    const f = document.createElement("div");
+    f.className = "flash"; f.textContent = "⚠ 闪回：创伤记忆被强制触发！";
+    card.appendChild(f);
+  }
+  bubble(card, "TA 的反应", out.action);
+  pending = card;
+  optionsUI(card, out.options);
+  $("stream").scrollTop = 0;
+}
+
+async function act(kind){
+  const out = await api("/api/act", { kind });
+  render(out.state);
+  const card = pending || addCard(out, "行动", "neu");
+  if(out.deviant){
+    const f = document.createElement("div");
+    f.className = "flash";
+    f.textContent = "⚠ 越轨行为已执行" + (out.effects?.aftermath?"":"");
+    card.appendChild(f);
+  }
+  bubble(card, "你选择了", OPTION_CN[kind] + " → " + out.action);
+  // remove option buttons
+  card.querySelectorAll(".options").forEach(el => el.remove());
+  pending = null;
+}
+
+async function refresh(){ render(await (await fetch("/api/state")).json()); }
+
+$("send-btn").onclick = sendEvent;
+$("event-input").addEventListener("keydown", e => { if(e.key==="Enter") sendEvent(); });
+$("sleep-btn").onclick = async () => { const o = await api("/api/sleep"); render(o.state); };
+$("reset-btn").onclick = async () => { await api("/api/reset"); location.reload(); };
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>
