@@ -105,7 +105,8 @@ class OpenAICompatLLM(LLMClient):
 
     def __init__(self, api_key: str | None = None, base_url: str | None = None,
                  model: str | None = None, proxy: str | None = None,
-                 temperature: float = 0.4, max_tokens: int = 1024):
+                 temperature: float = 0.4, max_tokens: int = 1024,
+                 thinking: str = "auto"):
         self.api_key = api_key or os.environ.get("HE_API_KEY", "")
         self.base_url = (base_url or os.environ.get("HE_BASE_URL")
                          or "https://api.openai.com/v1").rstrip("/")
@@ -113,11 +114,23 @@ class OpenAICompatLLM(LLMClient):
         self.proxy = proxy if proxy is not None else os.environ.get("HE_PROXY", "")
         self.temperature = temperature
         self.max_tokens = max_tokens
+        # thinking mode: HE_THINKING=enabled|disabled forces it; otherwise
+        # auto: disable on DeepSeek (fast/cheap structured calls), and omit
+        # the param entirely for endpoints that don't know it
+        env_thinking = os.environ.get("HE_THINKING")
+        if thinking != "auto":
+            self.thinking = thinking
+        elif env_thinking in ("enabled", "disabled"):
+            self.thinking = env_thinking
+        elif "deepseek" in self.base_url:
+            self.thinking = "disabled"
+        else:
+            self.thinking = None
 
     # ------------------------------------------------------------------
     def _chat(self, system: str, user: str) -> str:
         """One chat completion call; returns assistant text. Raises on error."""
-        payload = json.dumps({
+        payload = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system},
@@ -126,7 +139,10 @@ class OpenAICompatLLM(LLMClient):
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
             "response_format": {"type": "json_object"},
-        }).encode()
+        }
+        if self.thinking in ("enabled", "disabled"):
+            payload["thinking"] = {"type": self.thinking}
+        payload = json.dumps(payload).encode()
         req = urllib.request.Request(
             f"{self.base_url}/chat/completions", data=payload,
             headers={"Content-Type": "application/json",

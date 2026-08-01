@@ -80,6 +80,34 @@ class TestOpenAICompatLLM(unittest.TestCase):
         with mock.patch.dict("os.environ", {"HE_API_KEY": "k"}, clear=True):
             self.assertIsInstance(make_llm(), OpenAICompatLLM)
 
+    def test_thinking_param_logic(self):
+        # DeepSeek: auto -> thinking disabled sent
+        ds = OpenAICompatLLM(api_key="k", base_url="https://api.deepseek.com",
+                             model="m", proxy="")
+        self.assertEqual(ds.thinking, "disabled")
+        # unknown endpoint: param omitted entirely
+        other = OpenAICompatLLM(api_key="k", base_url="https://api.x.com/v1",
+                                model="m", proxy="")
+        self.assertIsNone(other.thinking)
+        # forced by env
+        with mock.patch.dict("os.environ", {"HE_THINKING": "enabled"}, clear=True):
+            forced = OpenAICompatLLM(api_key="k",
+                                     base_url="https://api.deepseek.com",
+                                     model="m", proxy="")
+        self.assertEqual(forced.thinking, "enabled")
+
+    @mock.patch("urllib.request.build_opener")
+    def test_chat_payload_includes_thinking(self, mock_builder):
+        captured = {}
+        def fake_open(req, timeout=90):
+            captured["body"] = json.loads(req.data)
+            return FakeResponse('{"ok": true}')
+        mock_builder.return_value.open.side_effect = fake_open
+        llm = OpenAICompatLLM(api_key="k", base_url="https://api.deepseek.com",
+                              model="m", proxy="")
+        llm._chat("sys", "user")
+        self.assertEqual(captured["body"]["thinking"], {"type": "disabled"})
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
