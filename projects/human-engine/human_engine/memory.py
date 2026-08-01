@@ -30,6 +30,7 @@ class TraumaFragment:
     fragment: str            # raw sensory fragment text
     arousal: float
     t: float
+    flashbacks: int = 0      # how many times it has intruded
     consolidated: bool = False   # once contextualized, stops forcing flashbacks
 
 
@@ -62,11 +63,14 @@ class Memory:
         rng = rng or random
         mood_p = state.mood_pad[0]
         scored = []
+        rumination = state.depression_tendency > 0.4  # Nolen-Hoeksema: rumination
         for it in self.episodic:
             age = max(0.0, state.t - it.t)
             recency = math.exp(-self.decay_lambda * age)
             congruence = 1.0 + max(-0.5, min(0.5, it.valence * mood_p))
             score = recency * it.importance * (1.0 + it.arousal * 0.5) * congruence
+            if rumination and it.valence < -0.3:
+                score *= 1.0 + state.depression_tendency * 0.6
             scored.append((score + rng.uniform(0, 0.05), it))
         scored.sort(key=lambda x: -x[0])
         return [it for _, it in scored[:k]]

@@ -71,11 +71,22 @@ class Engine:
         frag = self.memory.check_flashback(raw, s)
         flashback = False
         if frag is not None:
-            flashback = True
-            s.vigilance = clamp(s.vigilance + 0.15, 0, 1)
-            # PAD dragged toward trauma state
-            p, a0, d = s.pad
-            s.pad = (clamp(p - 0.4, -1, 1), clamp(a0 + 0.35, -1, 1), clamp(d - 0.3, -1, 1))
+            # probabilistic intrusion: arousal x depression, low when resources high
+            prob = min(1.0, 0.3 + frag.arousal * 0.3
+                       + s.depression_tendency * 0.25
+                       - s.resources / 400)
+            if self.rng.random() < prob:
+                flashback = True
+                frag.flashbacks += 1
+                s.vigilance = clamp(s.vigilance + 0.15, 0, 1)
+                # PAD dragged toward trauma state
+                p, a0, d = s.pad
+                s.pad = (clamp(p - 0.4, -1, 1), clamp(a0 + 0.35, -1, 1),
+                         clamp(d - 0.3, -1, 1))
+            else:
+                # near-miss: avoidance pre-activation (anxiety near trauma cues)
+                s.vigilance = clamp(s.vigilance + 0.06, 0, 1)
+                s.stress = clamp(s.stress + 3.0, 0, 100)
 
         # 3. emotion shock
         strength = emotion.apply_appraisal(a, self.persona, s)
@@ -153,16 +164,29 @@ class Engine:
             "neutral": {"neutral_act": 1.0},
         }.get(label, {"neutral_act": 1.0})
 
-        # impulse & norms
+        # impulse & norms (GST -> deviance)
         impulse = morality.compute_impulse(a, self.persona, s)
         s.impulse = impulse
-        deviant_candidate = impulse > 0.6
+        # opportunity factors lower the barrier (routine activity theory:
+        # anonymity / absent guardianship)
+        anonymous = any(k in a["text"] for k in
+                        ["网上", "深夜", "没人", "匿名", "一个人", "暗处", "无人"])
+        deviant_candidate = impulse > (0.45 if anonymous else 0.6)
         norm = morality.norm_check("impulsive_attack", self.persona, s)
         if deviant_candidate and norm["effective"] > 0.5:
             deviant_candidate = False   # norms still hold
         mech = morality.disengagement_pressure(self.persona, s, impulse, self.rng)
 
         scores = dict(tendency)
+        # learned helplessness: repeated crashes suppress active coping and
+        # raise freezing (Seligman); depression adds rumination-driven passivity
+        helpless = min(1.0, s.crash_count * 0.12 + s.depression_tendency * 0.3)
+        if helpless > 0:
+            for k in ("confront", "vent", "seek_support"):
+                if k in scores:
+                    scores[k] *= 1.0 - helpless * 0.8
+            scores["freeze"] = scores.get("freeze", 0) + helpless * 1.0
+            scores["avoid"] = scores.get("avoid", 0) + helpless * 0.3
         if deviant_candidate:
             scores["impulsive_attack"] = scores.get("impulsive_attack", 0) + 2.5 + impulse
         scores.setdefault("neutral_act", 0.4)
@@ -171,10 +195,19 @@ class Engine:
         return {"behavior": behavior,
                 "deviant": behavior in ("impulsive_attack", "impulsive_selfharm", "fight"),
                 "impulse": impulse, "norm_effective": norm["effective"],
-                "disengagement": mech}
+                "disengagement": mech, "anonymous": anonymous}
 
 
     # ------------------------------------------------------------------
+    def _process_recent_trauma(self):
+        """Safe-context retelling consolidates the most recent unprocessed
+        trauma fragment (Foa emotional processing; Nader reconsolidation)."""
+        for frag in reversed(self.memory.trauma):
+            if not frag.consolidated:
+                frag.consolidated = True
+                return frag
+        return None
+
     def act(self, behavior: str, pipeline: dict | None = None) -> dict:
         """Execute a chosen behavior (game mode: player picks; spec §5.2).
 
@@ -223,6 +256,12 @@ class Engine:
         if behavior in ("impulsive_selfharm", "impulsive_attack"):
             s.impulse = 0.3  # discharge
 
+        # safe-context retelling processes the most recent trauma fragment
+        processed = None
+        if self.memory.trauma and behavior in ("seek_support", "confront"):
+            if behavior == "seek_support" or s.resources > 50:
+                processed = self._process_recent_trauma()
+
         # memory of the response
         self.memory.add_episodic(t=s.t, text=f"[应对] {behavior}", valence=p[0],
                                  arousal=abs(p[0]), importance=0.4)
@@ -231,7 +270,8 @@ class Engine:
                                     self.memory.retrieve("", s, k=2, rng=self.rng)],
                                    {"behavior": behavior, "deviant": deviant})
         return {"behavior": behavior, "deviant": deviant, "action": action.text,
-                "effects": eff}
+                "effects": eff,
+                "processed_trauma": processed.fragment if processed else None}
 
     def options(self, pipeline: dict | None = None) -> list[dict]:
         """Candidate behaviors for the player (game mode), with recommendation."""

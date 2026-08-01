@@ -25,6 +25,7 @@ class State:
     resources: float = 80.0            # 0-100
     threshold: float = 70.0            # crash threshold; permanently drops
     wear: float = 0.0                  # allostatic wear (permanent)
+    crash_count: int = 0               # total crashes (learned helplessness)
     gas_phase: str = "normal"          # normal/alert/resistance/exhausted/crashed
     crashed: bool = False
     crash_type: str = ""               # freeze / fight / dissociate

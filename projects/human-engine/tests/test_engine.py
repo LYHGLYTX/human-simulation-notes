@@ -112,5 +112,75 @@ class TestPipelineRecord(unittest.TestCase):
             self.assertIn(key, out)
 
 
+class TestM2Deepening(unittest.TestCase):
+    """M2: probabilistic flashbacks, trauma processing, opportunity factors,
+    learned helplessness, rumination."""
+
+    def test_flashback_not_guaranteed(self):
+        # same trauma-cue event across seeds: sometimes flashback, sometimes not
+        results = []
+        for seed in range(8):
+            e = Engine(seed=seed)
+            e.handle_event("有人当众羞辱了你，所有人都在笑")
+            e.handle_event("你被最好的朋友背叛了")
+            out = e.handle_event("有人在聚会上当众提起当年的事")
+            results.append(out["flashback"])
+        self.assertTrue(any(results), "应至少一次闪回")
+        self.assertFalse(all(results), "不应每次都闪回（概率化）")
+
+    def test_near_miss_raises_vigilance(self):
+        e = Engine(seed=3)
+        e.handle_event("有人当众羞辱了你，所有人都在笑")
+        v0 = e.state.vigilance
+        # repeated cue exposure without crash should at least pre-activate
+        e.handle_event("有人在聚会上当众提起当年的事")
+        self.assertGreaterEqual(e.state.vigilance, v0)
+
+    def test_seek_support_consolidates_trauma(self):
+        e = Engine(seed=4)
+        e.handle_event("你被最好的朋友背叛了，所有人都知道")
+        self.assertGreater(len(e.memory.trauma), 0)
+        out = e.act("seek_support")
+        self.assertIsNotNone(out["processed_trauma"], "倾诉应处理最近创伤碎片")
+        self.assertTrue(any(f.consolidated for f in e.memory.trauma))
+
+    def test_learned_helplessness_freezes(self):
+        e = Engine(seed=5)
+        e.state.emotion_label = "sadness"
+        e.state.pad = (-0.5, -0.2, -0.3)
+        e.state.crash_count = 5   # multiple crashes in the past
+        e.state.depression_tendency = 0.5
+        d = e.decide({"valence": -0.6, "goal_relevance": 0.8,
+                      "coping_potential": 0.3, "control": 0.4,
+                      "norm_violation": 0.0, "novelty": 0.3, "text": "你失去了工作"},
+                     flashback=False)
+        self.assertEqual(d["behavior"], "freeze",
+                         f"多次崩溃后应习得性无助（冻结），got {d['behavior']}")
+
+    def test_anonymity_lowers_deviance_barrier(self):
+        # same impulse level: anonymous context crosses the threshold
+        e1 = Engine(seed=6)
+        e1.state.self_control = 30
+        d_open = e1.decide({"valence": -0.6, "goal_relevance": 0.8,
+                            "coping_potential": 0.3, "control": 0.4,
+                            "norm_violation": 0.0, "novelty": 0.3,
+                            "text": "有人在白天当众羞辱了你"},
+                           flashback=False)
+        e2 = Engine(seed=6)
+        e2.state.self_control = 30
+        d_anon = e2.decide({"valence": -0.6, "goal_relevance": 0.8,
+                            "coping_potential": 0.3, "control": 0.4,
+                            "norm_violation": 0.0, "novelty": 0.3,
+                            "text": "深夜的网上，没人知道你是谁，有人羞辱了你"},
+                           flashback=False)
+        self.assertTrue(d_anon.get("anonymous"))
+        self.assertFalse(d_open.get("anonymous"))
+        self.assertGreaterEqual(d_anon["impulse"] > 0.45, d_open["impulse"] > 0.6)
+        # same impulse, different barriers: anonymous should be more likely deviant
+        self.assertGreaterEqual(
+            int(d_anon["deviant"]), int(d_open["deviant"]),
+            "匿名情境不应降低越轨概率")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

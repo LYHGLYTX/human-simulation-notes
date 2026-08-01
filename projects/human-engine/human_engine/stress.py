@@ -51,6 +51,7 @@ def check_crash(persona: Persona, state: State) -> bool:
 
     if acute or chronic:
         state.crashed = True
+        state.crash_count += 1
         # crash type by personality x situation (Fanselow defense cascade)
         if state.pad[0] < -0.4 and state.pad[2] < -0.3 and persona.bis > persona.bas:
             state.crash_type = "freeze"       # 木僵/冻结
