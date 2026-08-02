@@ -115,6 +115,22 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/sleep":
                 r = engine.sleep(8.0)
                 self._send({"ok": True, "sleep": r, "state": _snapshot()})
+            elif path == "/api/batch":
+                # batch simulation (spec §5.3): {scenario, n, persona} -> report
+                from .simulation import run_batch, PERSONA_PRESETS
+                from .scenarios import SCENARIOS
+                scenario = data.get("scenario", "stress")
+                try:
+                    n = max(1, min(200, int(data.get("n", 20))))
+                except (TypeError, ValueError):
+                    n = 20
+                pname = data.get("persona", "default")
+                events = SCENARIOS.get(scenario, SCENARIOS["stress"])
+                persona = PERSONA_PRESETS.get(pname, PERSONA_PRESETS["default"])()
+                r = run_batch(events, n=n, persona=persona,
+                              seed_base=int(data.get("seed", 0)))
+                self._send({"ok": True, "scenario": scenario, "persona": pname,
+                            "report": r.as_dict()})
             else:
                 self._send({"error": "not found"}, 404)
 

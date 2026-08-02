@@ -33,6 +33,8 @@ python -m human_engine.cli --demo        # 脚本演示场景
 python -m human_engine.cli               # 交互模式（输入事件，/help 看命令）
 python -m human_engine.cli --once "你被当众羞辱了"
 python -m human_engine.web               # 🎮 游戏化 Web UI → http://localhost:8000
+python -m human_engine.simulation --scenario extreme --n 50   # 🔬 批量模拟（研究层）
+python -m human_engine.simulation --scenario stress --compare # 多人格对照（M6 盲评材料）
 python -m unittest tests/test_engine.py  # 测试
 ```
 
@@ -71,6 +73,23 @@ python -m human_engine.cli --demo         # 现在走真实 LLM
 - **generate**：注入人格+状态+相关记忆+行为决策，生成第一人称反应
 - 未设置 `HE_API_KEY` 时自动用 MockLLM（离线可跑）
 
+## 🔬 批量模拟（M5 起步，spec §5.3/§6.1）
+
+同一事件序列跑 N 次（每次独立 seed），聚合统计：
+
+```bash
+cd projects/human-engine
+python -m human_engine.simulation --scenario extreme --n 50
+python -m human_engine.simulation --scenario stress --compare   # default/resilient/fragile/impulsive 四人格对比
+```
+
+- 输出：崩溃率 / 首崩时点分布 / 恢复率 / 行为分布 / 闪回与越轨计数 / 终态均值±std / PCL-5·PHQ-9·STAI 量表均值±std
+- 确定性：同 `seed_base` 结果完全一致
+- 人格预设：`default` / `resilient`（高韧性）/ `fragile`（低韧性高神经质）/ `impulsive`（高 BAS）
+- 示例结论（stress 场景 × 15 runs）：resilient 崩溃率 **7%** vs fragile **100%**；impulsive 越轨 **15 次** vs 其他组 ≤1 次——人格对比方向符合理论（Bonanno 韧性 / GST）
+- Web UI 左侧面板可直接跑（🔬 批量模拟）
+- 默认 MockLLM（统计的是确定性动力学，不是 LLM 表现）；传 `llm=` 可换真实模型
+
 ## 当前能力（M1–M3 + 关系/生理层 + 深化 pass）
 
 - ✅ 完整 8 步事件管线（感知→appraisal→情绪→应激→记忆→决策→行为→反馈）
@@ -88,6 +107,7 @@ python -m human_engine.cli --demo         # 现在走真实 LLM
 - ✅ 学习：RPE 奖赏期望适应（PVLV-lite）+ 事件序列预测误差（htm-lite）
 - ✅ 访谈生成个体（1,000 People 范式：问卷答案 → 人格/图式/人生年表）
 - ✅ 临床量表（PCL-5/PHQ-9/PANAS/STAI）+ 场景库断言验证
+- ✅ 批量模拟：N 次 runs 统计（崩溃率/恢复率/行为分布/量表）+ 多人格对照（M6 材料）
 
 ## 🧪 验证（阶段 4：一致性 + 量表 + 场景库）
 

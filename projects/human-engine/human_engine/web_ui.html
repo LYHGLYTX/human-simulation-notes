@@ -84,6 +84,19 @@
         <button class="btn" id="sleep-btn">😴 睡觉</button>
         <button class="btn" id="reset-btn">↺ 重置</button>
       </div>
+      <div style="margin-top:10px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+        <select class="btn" id="batch-scenario">
+          <option value="stress">stress</option><option value="extreme">extreme</option>
+          <option value="trauma">trauma</option><option value="daily">daily</option>
+        </select>
+        <select class="btn" id="batch-persona">
+          <option value="default">default</option><option value="resilient">resilient</option>
+          <option value="fragile">fragile</option><option value="impulsive">impulsive</option>
+        </select>
+        <input id="batch-n" value="20" title="次数" style="width:46px;background:#0f1117;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:5px;text-align:center;">
+        <button class="btn" id="batch-btn">🔬 批量模拟</button>
+      </div>
+      <div id="batch-out" class="moodline" style="white-space:pre;font-size:11px;margin-top:8px;"></div>
       <h2 style="margin-top:16px;">关系图</h2>
       <div id="relations-panel" class="moodline"></div>
       <div id="persona"></div>
@@ -229,6 +242,22 @@ $("send-btn").onclick = sendEvent;
 $("event-input").addEventListener("keydown", e => { if(e.key==="Enter") sendEvent(); });
 $("sleep-btn").onclick = async () => { const o = await api("/api/sleep"); render(o.state); };
 $("reset-btn").onclick = async () => { await api("/api/reset"); location.reload(); };
+$("batch-btn").onclick = async () => {
+  const o = await api("/api/batch", {
+    scenario: $("batch-scenario").value,
+    persona: $("batch-persona").value,
+    n: parseInt($("batch-n").value) || 20 });
+  if(!o.report) { $("batch-out").textContent = "错误: " + JSON.stringify(o); return; }
+  const r = o.report;
+  const dist = Object.entries(r.behavior_dist).sort((a,b)=>b[1]-a[1]).slice(0,5)
+    .map(([k,v])=>k+":"+v).join(" ");
+  $("batch-out").textContent =
+    `[${o.scenario} × ${r.n} runs × ${o.persona}]\n` +
+    `崩溃率 ${(r.crash_rate*100).toFixed(0)}% 首崩时点 ${r.crash_at.slice(0,8).join(",")}${r.crash_at.length>8?"…":""}\n` +
+    `阈值降 ${r.threshold_drop} · 行为 ${dist}\n` +
+    `终态 stress ${r.final.stress} res ${r.final.resources} 抑郁 ${r.final.depression}\n` +
+    `PCL-5 ${r.scales.pcl5} · PHQ-9 ${r.scales.phq9} · STAI ${r.scales.stai_s}`;
+};
 refresh();
 setInterval(refresh, 3000);
 </script>
