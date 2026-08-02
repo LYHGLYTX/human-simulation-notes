@@ -129,7 +129,7 @@ class TestMundaneChannel(unittest.TestCase):
         e = Engine(seed=13, llm=MockLLM())
         e.handle_event("随便聊聊")
         self.assertAlmostEqual(e.state.rpe, 0.0, places=3,
-                               "中性事件不应产生负奖赏预测误差")
+                               msg="中性事件不应产生负奖赏预测误差")
 
     def test_negative_events_still_hit(self):
         from human_engine.llm import MockLLM
