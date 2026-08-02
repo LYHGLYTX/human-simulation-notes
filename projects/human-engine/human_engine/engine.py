@@ -124,7 +124,9 @@ class Engine:
         decision = self.decide(a, flashback)
         if rel_change:
             decision["relation"] = rel_change
-            self.relations.apply_behavior(decision.get("behavior", ""))
+            # NOTE: relation consequences of the behavior itself are applied
+            # in act() — in game mode the player's pick overrides the engine's
+            # automatic decision, so applying here would double-count.
 
         # 7. generate action
         snapshot = s.snapshot()
