@@ -41,7 +41,9 @@ def handle(e: Engine, line: str) -> bool:
         elif cmd in ("appr",):
             p = e.state.last_pipeline
             if p:
-                print("    appraisal:", {k: round(v, 2) for k, v in p["appraisal"].items()})
+                a = {k: round(v, 2) for k, v in p["appraisal"].items()
+                     if isinstance(v, (int, float))}
+                print("    appraisal:", a)
         elif cmd == "auto":
             e.autopilot_enabled = not e.autopilot_enabled
             print(f"  自主生活 {'开启' if e.autopilot_enabled else '关闭'}（日常事件流+自动睡眠）")
