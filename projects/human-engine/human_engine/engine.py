@@ -7,7 +7,8 @@ import random
 from .persona import Persona, default_persona
 from .state import State
 from .memory import Memory
-from . import emotion, stress, morality
+from . import emotion, stress, morality, physiology
+from .relations import Relations
 from .llm import LLMClient, MockLLM, make_llm
 from ._clamp import clamp
 
@@ -33,6 +34,8 @@ class Engine:
         # seed life history into episodic memory (with trauma channel for severe ones)
         self.memory = Memory()
         self._seed_history()
+        # social relations graph (spec §2.6)
+        self.relations = Relations()
         self.event_queue: list[str] = []
 
     def _seed_history(self):
@@ -47,8 +50,12 @@ class Engine:
                                    if kw in h["text"]] or ["抛弃"])
 
     # ------------------------------------------------------------------
-    def tick(self, dt: float = 1.0):
+    def tick(self, dt: float = 1.0, sleeping: bool = False):
+        """Advance time: relaxation + physiology (wake or sleep) + relations,
+        then process queued events."""
         self.state.relax(self.persona, dt)
+        physiology.update(self.state, self.persona, dt, sleeping=sleeping)
+        self.relations.relax(dt)
         # process queued events
         while self.event_queue:
             raw = self.event_queue.pop(0)
@@ -69,6 +76,10 @@ class Engine:
         appr = self.llm.appraise(event, self.persona, s)
         a = appr.as_dict()
         a["text"] = raw
+
+        # 2.5 social relation update (spec §2.6): who is this about?
+        rel_change = self.relations.apply_event(
+            raw, event.type, a["valence"], self.persona, s, s.t)
 
         # flashback check (trauma channel, bypasses normal retrieval)
         frag = self.memory.check_flashback(raw, s)
@@ -111,10 +122,14 @@ class Engine:
 
         # 6. decision
         decision = self.decide(a, flashback)
+        if rel_change:
+            decision["relation"] = rel_change
+            self.relations.apply_behavior(decision.get("behavior", ""))
 
         # 7. generate action
         snapshot = s.snapshot()
         snapshot["persona_summary"] = self.persona.summary_text()
+        snapshot["relations_summary"] = self.relations.summary_text()
         context = [m.as_dict() for m in
                    self.memory.retrieve(raw, s, k=3, rng=self.rng)]
         if flashback and frag:
@@ -134,6 +149,7 @@ class Engine:
         s.last_pipeline = {
             "raw": raw, "event_type": event.type, "appraisal": a,
             "strength": strength, "flashback": flashback,
+            "relation_change": rel_change,
             "decision": decision, "action": action.text,
             "memory_after": self.memory.summarize(),
         }
@@ -167,6 +183,16 @@ class Engine:
             "calm": {"neutral_act": 1.6, "confront": 0.5},
             "neutral": {"neutral_act": 1.0},
         }.get(label, {"neutral_act": 1.0})
+
+        # power asymmetry suppresses direct confrontation in negative events
+        # (Fanselow defense cascade: no escape -> avoid/freeze)
+        power = self.relations.power_pressure(a.get("valence", 0.0))
+        if power > 0.25:
+            for k in ("confront", "impulsive_attack"):
+                if k in tendency:
+                    tendency[k] *= 1.0 - power * 0.6
+            tendency["avoid"] = tendency.get("avoid", 0) + power * 1.2
+            tendency["seek_support"] = tendency.get("seek_support", 0) + power * 0.4
 
         # impulse & norms (GST -> deviance)
         impulse = morality.compute_impulse(a, self.persona, s)
@@ -232,7 +258,14 @@ class Engine:
             "dissociate": {"stress": -10},
             "neutral_act": {"stress": -3},
         }
-        eff = effects.get(behavior, {})
+        eff = dict(effects.get(behavior, {}))
+
+        # social support amplifies seek_support payoff (Hobfoll COR: support
+        # is a resource; weak ties -> little relief)
+        if behavior == "seek_support":
+            support = self.relations.support_score()
+            eff["resources"] = eff.get("resources", 0) + int(support * 15)
+            eff["stress"] = eff.get("stress", 0) - support * 8
 
         # catharsis: confronting while angry releases some stress
         if behavior == "confront" and p[0] < -0.2 and p[1] > 0.3:
@@ -257,6 +290,11 @@ class Engine:
             act_res = {"success": self.rng.random() < 0.7,
                        "punished": self.rng.random() < 0.3}
             morality.after_deviance(self.persona, s, act_res)
+        # behavior consequences on relations (confront/fight vs power,
+        # support deepens the closest bond)
+        rel_after = self.relations.apply_behavior(behavior)
+        if rel_after:
+            eff["relation"] = rel_after
         if behavior in ("impulsive_selfharm", "impulsive_attack"):
             s.impulse = 0.3  # discharge
 
@@ -271,6 +309,7 @@ class Engine:
                                  arousal=abs(p[0]), importance=0.4)
         snapshot = s.snapshot()
         snapshot["persona_summary"] = self.persona.summary_text()
+        snapshot["relations_summary"] = self.relations.summary_text()
         action = self.llm.generate(snapshot,
                                    [m.as_dict() for m in
                                     self.memory.retrieve("", s, k=2, rng=self.rng)],

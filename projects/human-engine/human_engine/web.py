@@ -44,7 +44,10 @@ def _snapshot() -> dict:
         "vigilance": s.vigilance,
         "depression_tendency": s.depression_tendency,
         "energy": s.energy,
+        "sleep_debt": s.sleep_debt,
         "disengagement": max(s.moral_disengagement.values()),
+        "relations": engine.relations.snapshot(),
+        "support": engine.relations.support_score(),
         "persona": engine.persona.summary_text(),
         "memory": engine.memory.summarize(),
         "history": [{"text": m.text, "valence": m.valence,
@@ -110,10 +113,9 @@ class Handler(BaseHTTPRequestHandler):
                 engine = Engine(seed=11)
                 self._send({"ok": True})
             elif path == "/api/sleep":
-                engine.state.energy = 100.0
-                engine.state.resources = min(100.0, engine.state.resources + 40)
-                engine.state.self_control = min(100.0, engine.state.self_control + 30)
-                self._send({"ok": True, "state": _snapshot()})
+                from .physiology import sleep_session
+                r = sleep_session(engine.state, engine.persona, 8.0)
+                self._send({"ok": True, "sleep": r, "state": _snapshot()})
             else:
                 self._send({"error": "not found"}, 404)
 

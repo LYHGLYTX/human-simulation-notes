@@ -43,11 +43,11 @@ def handle(e: Engine, line: str) -> bool:
             if p:
                 print("    appraisal:", {k: round(v, 2) for k, v in p["appraisal"].items()})
         elif cmd == "sleep":
-            e.state.energy = 100.0
-            e.state.resources = min(100.0, e.state.resources + 40)
-            e.state.self_control = min(100.0, e.state.self_control + 30)
-            e.state.sleep_debt = 0.0
-            print("  睡了 8 小时。精力恢复，资源回升。")
+            from .physiology import sleep_session
+            r = sleep_session(e.state, e.persona, 8.0)
+            print(f"  睡了 8 小时。精力={r['energy']:.0f} 资源={r['resources']:.0f} "
+                  f"自控={r['self_control']:.0f} 睡眠债={r['sleep_debt']:.1f}h "
+                  f"应激={r['stress']:.0f}")
         elif cmd == "recover":
             from .stress import recover_from_crash
             if e.state.crashed:

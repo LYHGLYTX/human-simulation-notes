@@ -71,15 +71,21 @@ class State:
             _clamp(ma + (aa - ma) * k, -1, 1),
             _clamp(md + (ad - md) * k, -1, 1),
         )
-        # stress decays slowly; resources recover; self-control recovers
-        self.stress = _clamp(self.stress - 0.004 * dt * (1 + persona.resilience * 0.5), 0, 100)
-        self.resources = _clamp(self.resources + 0.008 * dt * (1 + persona.resilience), 0, 100)
-        self.self_control = _clamp(self.self_control + 0.02 * dt, 0, 100)
+        # stress decays slowly; resources recover; self-control recovers.
+        # fatigue (sleep debt) slows recovery and stress settling (embodied
+        # cognition: a sleep-deprived person regulates worse)
+        from .physiology import fatigue
+        fat = fatigue(self, persona)
+        self.stress = _clamp(
+            self.stress - 0.004 * dt * (1 + persona.resilience * 0.5)
+            * (1 - fat * 0.35), 0, 100)
+        self.resources = _clamp(
+            self.resources + 0.008 * dt * (1 + persona.resilience), 0, 100)
+        self.self_control = _clamp(
+            self.self_control + 0.02 * dt * (1 - fat * 0.5), 0, 100)
         # guilt/shame fade
         self.guilt = _clamp(self.guilt - 0.001 * dt, 0, 1)
         self.shame = _clamp(self.shame - 0.0008 * dt, 0, 1)
-        # physiology
-        self.energy = _clamp(self.energy - 0.002 * dt, 0, persona.energy_max)
         # gas phase
         self._update_gas_phase()
         self.t += dt

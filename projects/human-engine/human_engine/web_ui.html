@@ -84,6 +84,8 @@
         <button class="btn" id="sleep-btn">😴 睡觉</button>
         <button class="btn" id="reset-btn">↺ 重置</button>
       </div>
+      <h2 style="margin-top:16px;">关系图</h2>
+      <div id="relations-panel" class="moodline"></div>
       <div id="persona"></div>
     </div>
   </div>
@@ -123,6 +125,7 @@ function render(s){
   $("main-bars").innerHTML =
     bar("压力", s.stress, s.stress>s.threshold?"#f0574a":s.stress>60?"#f0b23a":"#4a6cf7") +
     bar("精力", s.energy, "#4cd07d") +
+    bar("睡眠债", s.sleep_debt, s.sleep_debt>6?"#f0574a":"#b07ce0", 8) +
     bar("应对资源", s.resources, s.resources<30?"#f0574a":"#37c6e0") +
     bar("自控力", s.self_control, s.self_control<30?"#f0574a":"#b07ce0") +
     bar("冲动", s.impulse*100, s.impulse>0.6?"#f0574a":"#8b90a0") +
@@ -133,6 +136,14 @@ function render(s){
     bar("唤醒A", (s.pad[1]+1)*50, "#f0b23a") +
     bar("支配D", (s.pad[2]+1)*50, "#4a6cf7");
   $("mood-line").textContent = `心境基线 P${(s.mood_pad[0]).toFixed(2)} A${(s.mood_pad[1]).toFixed(2)} D${(s.mood_pad[2]).toFixed(2)} · GAS阶段:${s.gas_phase} · 阈值:${Math.round(s.threshold)} · 磨损:${Math.round(s.wear)} · 警觉:${Math.round(s.vigilance*100)}%`;
+  const REL_CN = { partner:"伴侣", friend:"朋友", colleague:"同事", family:"家人", authority:"权威", stranger:"陌生人" };
+  const relHtml = (s.relations||[]).map(r =>
+    `<div>${REL_CN[r.kind]||r.kind}「${r.name}」 好感${(r.affinity*100).toFixed(0)} 信任${(r.trust*100).toFixed(0)}` +
+    (r.power_diff>0.1?` · 对方更有权`:r.power_diff<-0.1?` · 我更有权`:"") +
+    (r.attachment_activation>0.3?` · 🧷依恋激活`:"") +
+    ` · 互动${r.interactions}次</div>`).join("") || "（尚无往来之人）";
+  $("relations-panel").innerHTML =
+    `<div>社会支持：${(s.support*100).toFixed(0)}/100</div>` + relHtml;
   $("persona").textContent = s.persona + "\n" + s.memory;
   $("crashed-banner").style.display = s.crashed ? "block" : "none";
   $("crash-type").textContent = s.crash_type;
