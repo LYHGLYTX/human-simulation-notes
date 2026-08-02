@@ -142,14 +142,14 @@ def generate(behavior: str, snapshot: dict, persona, memories: list,
 
     # --- style shaping ---------------------------------------------------
     shaper = STYLE_SHAPER.get(style, STYLE_SHAPER["quiet"])
-    if rng.random() < 0.5:
-        desc += rng.choice(shaper["suffix"])
     if crashed:
         desc = rng.choice(CRASHED_PREFIX) + desc
     elif pad[1] > 0.4:                      # high arousal: raw, breathless
-        desc = desc.rstrip("。") + "！"
+        desc = desc.rstrip("。！？……") + "！"
     elif pad[1] < -0.2 and style == "quiet":
-        desc = desc.rstrip("。") + "……"
+        desc = desc.rstrip("。！？") + "……"
+    elif rng.random() < 0.5:
+        desc += rng.choice(shaper["suffix"])
 
     text = f"{desc}（{inner}）"
 
