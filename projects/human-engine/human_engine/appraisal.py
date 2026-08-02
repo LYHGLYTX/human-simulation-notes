@@ -35,6 +35,22 @@ INTENSITY_CUES: list[tuple[str, float]] = [
     ("有点", 0.7), ("稍微", 0.7), ("一点点", 0.6), ("不太", 0.8),
 ]
 
+# Strong-evidence negative words: multi-char / unambiguous terms that almost
+# never appear in chitchat. Used to gate the rule-over-LLM perceive fallback
+# (anti-whitewash) — a single-char keyword like 打 in 打算 must NOT override
+# the LLM's semantic judgment.
+STRONG_NEGATIVE_WORDS: list[str] = [
+    "威胁", "恐吓", "羞辱", "背叛", "出卖", "抛弃", "虐待", "囚禁",
+    "绑架", "暴力", "殴打", "挨打", "打你", "杀人", "杀死", "杀害",
+    "分手", "离婚", "去世", "离世", "死亡", "破产", "失业", "裁员",
+    "嘲笑", "孤立", "累赘", "被骗", "骗我", "骗了", "据为己有", "抢功",
+    "草泥马", "傻逼", "混蛋", "他妈的", "滚", "跟踪", "开除",
+]
+
+
+def _strong_negative(raw: str) -> bool:
+    return any(w in raw for w in STRONG_NEGATIVE_WORDS)
+
 
 def _intensity(raw: str) -> float:
     """Scale event intensity by cue words (multiplicative, clamped 0.5-2.0)."""

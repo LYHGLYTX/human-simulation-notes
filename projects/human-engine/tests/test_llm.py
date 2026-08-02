@@ -45,6 +45,34 @@ class TestOpenAICompatLLM(unittest.TestCase):
         self.assertEqual(ev.type, "neutral")
 
     @mock.patch("urllib.request.build_opener")
+    def test_perceive_llm_neutral_wins_over_keyword_misfire(self, mock_builder):
+        """LLM says neutral; rule says threat via 打 inside 打算 — the LLM's
+        semantic judgment must win (no strong negative evidence)."""
+        mock_builder.return_value.open.return_value = FakeResponse(
+            '{"type": "neutral", "intensity": 0.3}')
+        ev = self.llm.perceive("周末有什么打算", default_persona())
+        self.assertEqual(ev.type, "neutral",
+                         "关键词误伤不得覆盖 LLM 语义判断")
+
+    @mock.patch("urllib.request.build_opener")
+    def test_perceive_anti_whitewash_still_works(self, mock_builder):
+        """LLM whitewashes a severe event to neutral — strong evidence
+        (威胁/羞辱...) overrides it (anti-whitewash intent preserved)."""
+        mock_builder.return_value.open.return_value = FakeResponse(
+            '{"type": "neutral", "intensity": 1}')
+        ev = self.llm.perceive("陌生人在网上威胁要找到你", default_persona())
+        self.assertEqual(ev.type, "threat")
+
+    def test_strong_negative_gate(self):
+        from human_engine import appraisal as A
+        self.assertFalse(A._strong_negative("周末有什么打算"))
+        self.assertFalse(A._strong_negative("我先走了"))
+        self.assertFalse(A._strong_negative("笑死我了"))
+        self.assertTrue(A._strong_negative("有人威胁要打你"))
+        self.assertTrue(A._strong_negative("同事当众羞辱我"))
+        self.assertTrue(A._strong_negative("他妈的废物"))
+
+    @mock.patch("urllib.request.build_opener")
     def test_appraise_parses_and_clamps(self, mock_builder):
         mock_builder.return_value.open.return_value = FakeResponse(
             '{"novelty": 0.8, "valence": 0.1, "goal_relevance": 0.9, '

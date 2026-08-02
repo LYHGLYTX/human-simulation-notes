@@ -153,12 +153,17 @@ class OpenAICompatLLM(LLMClient):
         etype = out.get("type", "neutral")
         if etype not in _appraisal.EVENT_TYPES:
             etype = "neutral"
-        # rule-based fallback: strong negative keywords (slurs/violence) win
-        # over an LLM that plays it safe and says "neutral"
+        # rule-based fallback: strong negative evidence (slurs/violence/
+        # unambiguous terms) wins over an LLM that plays it safe and says
+        # "neutral". Gated by STRONG_NEGATIVE_WORDS so that keyword
+        # misfires (e.g. 打 inside 打算) can NEVER override the LLM's
+        # semantic judgment — the LLM decides, rules only rescue it from
+        # whitewashing genuinely severe events.
         rule = _appraisal.perceive(raw)
-        if etype == "neutral" and rule.type in (
+        if (etype == "neutral" and rule.type in (
                 "humiliation", "conflict", "threat", "betrayal",
-                "abandonment", "loss", "criticism", "rejection"):
+                "abandonment", "loss", "criticism", "rejection")
+                and _appraisal._strong_negative(raw)):
             etype = rule.type
         return _appraisal.Event(
             type=etype,
