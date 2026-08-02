@@ -138,6 +138,25 @@ class TestMundaneChannel(unittest.TestCase):
         e.handle_event("你被当众羞辱了")
         self.assertGreater(e.state.stress, s0 + 10, "负面事件冲击必须保留")
 
+    def test_chitchat_pressure_10x10_no_crash(self):
+        """10 sessions x 10 turns of small talk: no crash, no stress creep
+        (regression: keyword misfires like 打算->threat used to add ~+15)."""
+        from human_engine.llm import MockLLM
+        chitchat = ["你好啊", "你在做什么呢", "今天天气不错", "你吃饭了吗",
+                    "最近忙不忙", "你喜欢听什么音乐", "周末有什么打算",
+                    "你养宠物吗", "早点休息", "明天见"]
+        for seed in range(10):
+            e = Engine(seed=seed, llm=MockLLM())
+            s0 = e.state.stress
+            for msg in chitchat:
+                e.tick(60)
+                e.handle_event(msg)
+            self.assertFalse(e.state.crashed, f"seed {seed} 闲聊不应崩溃")
+            self.assertLess(e.state.stress, s0 + 8,
+                            f"seed {seed} 闲聊应激漂移过大: {s0}->{e.state.stress}")
+            self.assertGreaterEqual(e.state.resources, 80,
+                                    f"seed {seed} 闲聊不应耗竭资源")
+
 
 class TestIdentity(unittest.TestCase):
     def test_summary_has_identity(self):
