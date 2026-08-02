@@ -74,6 +74,7 @@
   <div>
     <div class="panel">
       <h2>角色状态</h2>
+      <div id="char-title" style="text-align:center;font-size:13px;color:var(--dim);margin-bottom:4px;"></div>
       <div id="face">😐</div>
       <div id="emotion-label">平静</div>
       <div class="bars" id="main-bars"></div>
@@ -82,6 +83,7 @@
       <div id="crashed-banner">💥 崩溃中（<span id="crash-type"></span>）—— 阈值已永久下降</div>
       <div style="margin-top:12px; display:flex; gap:8px;">
         <button class="btn" id="sleep-btn">😴 睡觉</button>
+        <button class="btn" id="auto-btn" style="border-color:#37c6e0;">🟢 自主生活</button>
         <button class="btn" id="reset-btn">↺ 重置</button>
       </div>
       <div style="margin-top:10px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
@@ -132,9 +134,13 @@ function bar(label, val, color, max=100){
 }
 
 function render(s){
+  # face
   $("face").textContent = EMOTION_FACE[s.emotion_label] || "😐";
   $("emotion-label").textContent = (EMOTION_CN[s.emotion_label]||s.emotion_label)
     + (s.crashed ? "（崩溃）" : "");
+  document.title = `${s.name||""} · human-engine`;
+  const title = document.querySelector("#char-title");
+  if(title) title.textContent = `${s.name||"?"} · ${s.age||"?"}岁 · ${s.speech_style||""}风格` + (s.autopilot?" · 🟢自主生活":"");
   $("main-bars").innerHTML =
     bar("压力", s.stress, s.stress>s.threshold?"#f0574a":s.stress>60?"#f0b23a":"#4a6cf7") +
     bar("精力", s.energy, "#4cd07d") +
@@ -230,6 +236,12 @@ async function act(kind){
     f.textContent = "⚠ 越轨行为已执行" + (out.effects?.aftermath?"":"");
     card.appendChild(f);
   }
+  if(out.behavior === "impulsive_selfharm"){
+    const w = document.createElement("div");
+    w.className = "flash";
+    w.textContent = "⚠ 模拟研究用途：若你或身边的人正经历类似困扰，请寻求专业帮助（如心理援助热线）。";
+    card.appendChild(w);
+  }
   bubble(card, "你选择了", OPTION_CN[kind] + " → " + out.action);
   // remove option buttons
   card.querySelectorAll(".options").forEach(el => el.remove());
@@ -241,6 +253,10 @@ async function refresh(){ render(await (await fetch("/api/state")).json()); }
 $("send-btn").onclick = sendEvent;
 $("event-input").addEventListener("keydown", e => { if(e.key==="Enter") sendEvent(); });
 $("sleep-btn").onclick = async () => { const o = await api("/api/sleep"); render(o.state); };
+$("auto-btn").onclick = async () => {
+  const o = await api("/api/autopilot", { on: !($("auto-btn").textContent.includes("🟢")) });
+  $("auto-btn").textContent = o.autopilot ? "🟢 自主生活·开" : "⚪ 自主生活·关";
+};
 $("reset-btn").onclick = async () => { await api("/api/reset"); location.reload(); };
 $("batch-btn").onclick = async () => {
   const o = await api("/api/batch", {

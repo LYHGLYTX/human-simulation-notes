@@ -27,6 +27,23 @@ EVENT_TYPES: dict[str, dict] = {
     "neutral":      {"valence": 0.0,  "novelty": 0.2, "relevance": 0.2, "kw": []},
 }
 
+# intensity modifiers: adverbs/scene cues scale event impact (0.5..2.0)
+INTENSITY_CUES: list[tuple[str, float]] = [
+    ("彻底", 1.5), ("完全", 1.4), ("极度", 1.5), ("狠狠", 1.4),
+    ("非常", 1.3), ("十分", 1.3), ("严重", 1.3), ("特别", 1.2),
+    ("当众", 1.2), ("公开", 1.15), ("所有人", 1.2),
+    ("有点", 0.7), ("稍微", 0.7), ("一点点", 0.6), ("不太", 0.8),
+]
+
+
+def _intensity(raw: str) -> float:
+    """Scale event intensity by cue words (multiplicative, clamped 0.5-2.0)."""
+    v = 1.0
+    for kw, mult in INTENSITY_CUES:
+        if kw in raw:
+            v *= mult
+    return max(0.5, min(2.0, v))
+
 
 @dataclass
 class Event:
@@ -65,7 +82,7 @@ def perceive(raw: str) -> Event:
         hits = sum(1 for kw in spec["kw"] if kw in raw)
         if hits > best_score:
             best, best_score = etype, hits
-    return Event(type=best, text=raw)
+    return Event(type=best, text=raw, intensity=_intensity(raw))
 
 
 def appraise(event: Event, persona: Persona, state: State,

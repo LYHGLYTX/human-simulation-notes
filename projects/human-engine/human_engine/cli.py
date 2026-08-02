@@ -42,6 +42,9 @@ def handle(e: Engine, line: str) -> bool:
             p = e.state.last_pipeline
             if p:
                 print("    appraisal:", {k: round(v, 2) for k, v in p["appraisal"].items()})
+        elif cmd == "auto":
+            e.autopilot_enabled = not e.autopilot_enabled
+            print(f"  自主生活 {'开启' if e.autopilot_enabled else '关闭'}（日常事件流+自动睡眠）")
         elif cmd == "sleep":
             r = e.sleep(8.0)
             print(f"  睡了 8 小时。精力={r['energy']:.0f} 资源={r['resources']:.0f} "

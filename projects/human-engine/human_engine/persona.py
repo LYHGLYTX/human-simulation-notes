@@ -48,6 +48,18 @@ class Persona:
     # Resilience (Bonanno): raises crash threshold, speeds recovery
     resilience: float = 0.5
 
+    # --- identity (the "alive" layer) ---
+    name: str = "林默"
+    age: int = 26
+    mannerisms: list = field(default_factory=lambda: [
+        "（低头搓着手指）", "……", "（声音很轻）", "（避开视线）",
+    ])
+    speech_style: str = "quiet"   # quiet / blunt / chatty / poetic
+    goals: list = field(default_factory=lambda: [
+        "攒够钱，离开这座城市",
+        "找到一个不会离开我的人",
+    ])
+
     # Baseline physiology
     energy_max: float = 100.0
     sleep_need: float = 8.0  # hours per day
@@ -92,11 +104,14 @@ class Persona:
     def summary_text(self) -> str:
         """Natural-language persona summary for LLM injection (spec §4.3)."""
         lines = [
+            f"身份：{self.name}，{self.age}岁。说话风格：{self.speech_style}。",
             f"人格：外倾{self.extraversion:.2f} 宜人{self.agreeableness:.2f} "
             f"尽责{self.conscientiousness:.2f} 神经质{self.neuroticism:.2f} "
             f"开放{self.openness:.2f}",
             f"依恋风格：{self.attachment}；BIS(焦虑)={self.bis:.2f} BAS(冲动)={self.bas:.2f}",
             f"核心图式：{', '.join(k for k, v in sorted(self.schemas.items(), key=lambda x: -x[1])[:3] if v > 0.25) or '无显著'}",
+            f"最近的目标：{'；'.join(self.goals) or '没有明确目标'}",
+            f"口头禅/习惯：{'；'.join(self.mannerisms[:2])}",
         ]
         return "\n".join(lines)
 

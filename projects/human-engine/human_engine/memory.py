@@ -33,6 +33,21 @@ def _topics(text: str) -> set[str]:
     return {w for w in TOPIC_WORDS if w in text}
 
 
+def _bigrams(text: str) -> Counter:
+    """Character bigram bag (zero-dep semantic proxy for Chinese)."""
+    chars = [c for c in text if not c.isspace()]
+    return Counter(zip(chars, chars[:-1]))
+
+
+def similarity(a: str, b: str) -> float:
+    """Cosine similarity of char bigrams, 0-1 (cheap offline semantics)."""
+    ca, cb = _bigrams(a), _bigrams(b)
+    if not ca or not cb:
+        return 0.0
+    dot = sum((ca & cb).values())
+    return dot / (sum(ca.values()) ** 0.5 * sum(cb.values()) ** 0.5 + 1e-9)
+
+
 @dataclass
 class MemoryItem:
     t: float
@@ -140,7 +155,10 @@ class Memory:
             age = max(0.0, state.t - it.t)
             recency = math.exp(-self.decay_lambda * age)
             congruence = 1.0 + max(-0.5, min(0.5, it.valence * mood_p))
-            relevance = 1.0 + min(1.0, len(q_topics & _topics(it.text)) * 0.4)
+            # thematic relevance: topic overlap + char-bigram cosine
+            relevance = 1.0 + min(1.0,
+                                  len(q_topics & _topics(it.text)) * 0.4
+                                  + similarity(query, it.text) * 0.8)
             score = (recency * it.importance * (1.0 + it.arousal * 0.5)
                      * congruence * relevance * (0.4 + 0.6 * it.consolidation))
             if rumination and it.valence < -0.3:

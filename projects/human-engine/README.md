@@ -73,7 +73,20 @@ python -m human_engine.cli --demo         # 现在走真实 LLM
 - **generate**：注入人格+状态+相关记忆+行为决策，生成第一人称反应
 - 未设置 `HE_API_KEY` 时自动用 MockLLM（离线可跑）
 
-## 🔬 批量模拟（M5 起步，spec §5.3/§6.1）
+## 🧬 活人层（identity / voice / autopilot）
+
+从骨架到血肉的四层：
+
+- **身份**：`Persona` 带名字/年龄/口头禅/说话风格（quiet/blunt/chatty/poetic）/目标；LLM prompt 与 UI 均注入
+- **表达**（`voice.py`）：行为×情绪×说话风格×口头禅×记忆引用的多变体文本——同一行为不同 seed 输出不同；崩溃时句子破碎；高唤醒时句式短促；35% 概率引用相关记忆（"眼前忽然闪过：…"）
+- **感知**：强度线索（"彻底/当众/有点"…）调制事件 intensity 0.5–2.0，传导到应激
+- **记忆**：字符 bigram 余弦相似度检索（零依赖语义近似），查询与记忆共享表达时召回更准
+- **自主生活**：`autopilot`（CLI `/auto` 或 web 🟢 开关）——每小时一个日常事件（发呆/喝茶/猫叫…）+ 深夜自动入睡（昼夜节律驱动，睡醒记入记忆）
+
+```bash
+python -m human_engine.cli --demo        # 走 voice 表达（有 key 时走真实 LLM）
+# 交互模式里输入 /auto 开启自主生活
+```
 
 同一事件序列跑 N 次（每次独立 seed），聚合统计：
 
@@ -108,6 +121,7 @@ python -m human_engine.simulation --scenario stress --compare   # default/resili
 - ✅ 访谈生成个体（1,000 People 范式：问卷答案 → 人格/图式/人生年表）
 - ✅ 临床量表（PCL-5/PHQ-9/PANAS/STAI）+ 场景库断言验证
 - ✅ 批量模拟：N 次 runs 统计（崩溃率/恢复率/行为分布/量表）+ 多人格对照（M6 材料）
+- ✅ 活人层：身份/口头禅/说话风格、state-driven 多变体表达、强度线索、语义检索、自主生活循环
 
 ## 🧪 验证（阶段 4：一致性 + 量表 + 场景库）
 

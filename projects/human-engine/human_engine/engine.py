@@ -15,6 +15,20 @@ from ._clamp import clamp
 
 TRAUMA_TYPES = {"humiliation", "betrayal", "abandonment", "threat", "loss"}
 
+# mundane life texture for autopilot (daily drift events)
+DAILY_DRIFT = [
+    "你盯着窗外发了会呆",
+    "手机响了，是个推销电话，你挂了",
+    "你泡了杯茶，烫到了手",
+    "楼下的猫在叫，你听了很久",
+    "你翻了下手机，看到一条旧消息，又关掉了",
+    "你去便利店买了瓶水，店员多找了你一块钱",
+    "你随手写了几个字，又划掉了",
+    "闹钟响了，你按掉，又躺了一会儿",
+    "天气不错，你站在阳台看了会儿云",
+    "你饿了，但懒得做饭，啃了个面包",
+]
+
 
 class Engine:
     def __init__(self, persona: Persona | None = None,
@@ -46,6 +60,7 @@ class Engine:
         # social relations graph (spec §2.6)
         self.relations = Relations()
         self.event_queue: list[str] = []
+        self.autopilot_enabled = False   # autonomous daily life (web toggle)
 
     def _update_beliefs(self, event_type: str, a: dict):
         """Beliefs are updated by experience (slow, bounded drift)."""
@@ -81,15 +96,42 @@ class Engine:
     # ------------------------------------------------------------------
     def tick(self, dt: float = 1.0, sleeping: bool = False):
         """Advance time: relaxation + physiology (wake or sleep) + relations,
-        then process queued events."""
+        then process queued events. Autopilot adds daily life when enabled."""
         self.state.relax(self.persona, dt)
         physiology.update(self.state, self.persona, dt, sleeping=sleeping)
         self.relations.relax(dt)
+        if self.autopilot_enabled and not sleeping:
+            self._autopilot(dt)
         # process queued events
         while self.event_queue:
             raw = self.event_queue.pop(0)
             self.handle_event(raw)
         return self.state
+
+    # ------------------------------------------------------------------
+    def _autopilot(self, dt: float):
+        """Autonomous daily life: mundane drift events + automatic sleep."""
+        s = self.state
+        # daily texture: a small mundane event ~once per sim hour
+        if not s.crashed and self.rng.random() < dt / 3600:
+            self.handle_event(self.rng.choice(DAILY_DRIFT))
+        # auto-sleep: night hours (22:00-6:00) + sleepy -> go to bed
+        if (not s.crashed and (s.phase >= 22.0 or s.phase < 6.0)
+                and s.sleep_debt > 4.0 and self.rng.random() < dt / 3600):
+            self._auto_sleep()
+
+    def _auto_sleep(self, hours: float = 7.0):
+        """Sleep overnight as a single consolidated window: physiology +
+        memory consolidation + reflection. Queued events wait until awake."""
+        pending = self.event_queue
+        self.event_queue = []
+        self.tick(hours * 3600.0, sleeping=True)
+        self.event_queue = pending + self.event_queue
+        self.memory.consolidate_all(self.state.t)
+        self.memory.reflect(self.state.t)
+        self.memory.add_episodic(
+            t=self.state.t, text=f"睡了 {hours:.0f} 小时，醒来还是有点累",
+            valence=0.1, arousal=0.1, importance=0.3)
 
     def inject(self, raw: str):
         self.event_queue.append(raw)
@@ -208,6 +250,7 @@ class Engine:
         snapshot = s.snapshot()
         snapshot["persona_summary"] = self.persona.summary_text()
         snapshot["relations_summary"] = self.relations.summary_text()
+        snapshot["_persona"] = self.persona   # voice layer needs style/mannerisms
         context = [m.as_dict() for m in
                    self.memory.retrieve(raw, s, k=3, rng=self.rng)]
         insight = self.memory.latest_insight()
@@ -429,6 +472,7 @@ class Engine:
         snapshot = s.snapshot()
         snapshot["persona_summary"] = self.persona.summary_text()
         snapshot["relations_summary"] = self.relations.summary_text()
+        snapshot["_persona"] = self.persona   # voice layer needs style/mannerisms
         action = self.llm.generate(snapshot,
                                    [m.as_dict() for m in
                                     self.memory.retrieve("", s, k=2, rng=self.rng)],

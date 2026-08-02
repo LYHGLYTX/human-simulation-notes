@@ -48,6 +48,11 @@ def _snapshot() -> dict:
         "disengagement": max(s.moral_disengagement.values()),
         "relations": engine.relations.snapshot(),
         "support": engine.relations.support_score(),
+        "name": engine.persona.name,
+        "age": engine.persona.age,
+        "speech_style": engine.persona.speech_style,
+        "goals": engine.persona.goals,
+        "autopilot": engine.autopilot_enabled,
         "persona": engine.persona.summary_text(),
         "memory": engine.memory.summarize(),
         "history": [{"text": m.text, "valence": m.valence,
@@ -109,6 +114,9 @@ class Handler(BaseHTTPRequestHandler):
                 out["options"] = engine.options()
                 out["state"] = _snapshot()
                 self._send(out)
+            elif path == "/api/autopilot":
+                engine.autopilot_enabled = bool(data.get("on", False))
+                self._send({"ok": True, "autopilot": engine.autopilot_enabled})
             elif path == "/api/reset":
                 engine = Engine(seed=11)
                 self._send({"ok": True})
