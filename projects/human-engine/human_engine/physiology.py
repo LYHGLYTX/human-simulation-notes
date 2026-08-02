@@ -22,6 +22,10 @@ def fatigue(state: State, persona: Persona) -> float:
 
 def update(state: State, persona: Persona, dt: float, sleeping: bool = False):
     """Per-tick physiology. Returns the current fatigue 0-1."""
+    # circadian phase 0-24h; night hours cost more energy (embodied rhythm)
+    phase = (state.t / 3600.0) % 24.0
+    state.phase = phase
+    night = phase >= 22.0 or phase < 6.0
     if sleeping:
         # sleep: the largest recovery source (spec §3.3.2)
         # repay debt slightly faster than real time (efficiency ~90%)
@@ -34,10 +38,12 @@ def update(state: State, persona: Persona, dt: float, sleeping: bool = False):
         state.self_control = clamp(state.self_control + dt * 0.028, 0, 100)
         state.stress = clamp(state.stress - dt * 0.007, 0, 100)
     else:
-        # wake: burn energy, accumulate debt proportional to sleep need
+        # wake: burn energy (faster at night), accumulate debt proportional
+        # to sleep need
+        rate = 0.0022 * (1.5 if night else 0.85)
+        state.energy = clamp(state.energy - dt * rate, 0, persona.energy_max)
         state.sleep_debt = clamp(
             state.sleep_debt + dt * (persona.sleep_need / 86400.0), 0, 24)
-        state.energy = clamp(state.energy - dt * 0.0022, 0, persona.energy_max)
     return fatigue(state, persona)
 
 

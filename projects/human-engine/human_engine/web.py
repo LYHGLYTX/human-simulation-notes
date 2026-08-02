@@ -113,8 +113,7 @@ class Handler(BaseHTTPRequestHandler):
                 engine = Engine(seed=11)
                 self._send({"ok": True})
             elif path == "/api/sleep":
-                from .physiology import sleep_session
-                r = sleep_session(engine.state, engine.persona, 8.0)
+                r = engine.sleep(8.0)
                 self._send({"ok": True, "sleep": r, "state": _snapshot()})
             else:
                 self._send({"error": "not found"}, 404)

@@ -28,6 +28,18 @@ def apply_appraisal(appr: dict, persona: Persona, state: State):
     da = (novelty * 0.45 + (1.0 - coping) * 0.25) * strength
     dd = (control - 0.5) * 0.5 * strength - norm_viol * 0.25 * strength
 
+    # WASABI: secondary (cognitive) emotions — events that engage goals and
+    # norms relax slower than reflexive primary emotions
+    depth = relevance * 0.5 + norm_viol * 0.6
+    state.emotion_decay_mod = 1.0 - 0.35 * depth   # 0.65..1.0
+
+    # FLAME: delayed burst — anger is banked only when self-control is high
+    # enough to suppress it (Baumeister: suppression costs control); it
+    # erupts later once the bank passes a threshold
+    if valence < -0.3 and coping > 0.35 and state.self_control > 50:
+        state.suppressed_anger = clamp(
+            state.suppressed_anger + abs(valence) * strength * 0.45, 0, 1)
+
     p, a, d = state.pad
     state.pad = (
         clamp(p + dp, -1, 1),
@@ -48,8 +60,20 @@ def apply_appraisal(appr: dict, persona: Persona, state: State):
 
 
 def label_from_pad(pad: tuple[float, float, float]) -> str:
-    """Map PAD coordinates to a discrete emotion label (Russell-style)."""
+    """Map PAD coordinates to a discrete emotion label (Russell-style).
+
+    Semantic refinement over the original 9 labels: low-arousal positive
+    states are now 'relief' (was calm), aroused-dominant negative states
+    'contempt' (was anger — more hostile, see tendency table), mildly
+    positive aroused states 'hopeful'. These are intentional."""
     p, a, d = pad
+    # extended labels (backward compatible: old regions unchanged)
+    if p > 0.12 and a < -0.15 and d > -0.1:
+        return "relief"        # 释然: positive, deactivated
+    if p > 0.05 and a > 0.2 and d > 0.15:
+        return "hopeful"       # 希望: mildly positive, aroused, dominant
+    if p < -0.1 and a > 0.3 and d > 0.1:
+        return "contempt"      # 轻蔑/敌意: negative, aroused, dominant
     if p > 0.2:
         return "joy" if a > 0.15 else "calm"
     if p < -0.15:

@@ -43,11 +43,13 @@ def handle(e: Engine, line: str) -> bool:
             if p:
                 print("    appraisal:", {k: round(v, 2) for k, v in p["appraisal"].items()})
         elif cmd == "sleep":
-            from .physiology import sleep_session
-            r = sleep_session(e.state, e.persona, 8.0)
+            r = e.sleep(8.0)
             print(f"  睡了 8 小时。精力={r['energy']:.0f} 资源={r['resources']:.0f} "
                   f"自控={r['self_control']:.0f} 睡眠债={r['sleep_debt']:.1f}h "
-                  f"应激={r['stress']:.0f}")
+                  f"应激={r['stress']:.0f}"
+                  + (f" 归档记忆{r['archived']}条" if r.get("archived") else ""))
+            if r.get("insight"):
+                print(f"  睡梦中浮现一个念头：{r['insight']}")
         elif cmd == "recover":
             from .stress import recover_from_crash
             if e.state.crashed:

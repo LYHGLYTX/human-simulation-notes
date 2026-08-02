@@ -14,6 +14,11 @@ class State:
     pad: tuple[float, float, float] = (0.0, 0.0, 0.0)   # P/A/D in [-1,1]
     emotion_label: str = "neutral"
     emotion_strength: float = 0.0
+    emotion_decay_mod: float = 1.0   # WASABI secondary emotion: cognitive
+                                     # depth slows relaxation (0.5-1.0)
+    suppressed_anger: float = 0.0    # FLAME delayed burst: banked anger 0-1
+    decay_lambda: float = 0.0005     # shared with memory (MemoryBank: emotion
+                                     # decay uses the same time base)
 
     # --- mood layer (minutes-hours) ---
     mood_pad: tuple[float, float, float] = (0.0, 0.0, 0.0)
@@ -41,9 +46,27 @@ class State:
         ["moral_justification", "euphemism", "diffusion", "blaming_victim",
          "dehumanization", "displacement", "distortion", "minimizing"]})
 
+    # --- beliefs (PsychSim-style explicit belief layer) ---
+    # 0-1 strengths about self/world/others; color appraisal (Ehlers & Clark
+    # threat overestimation; Beck negative triad)
+    beliefs: dict = field(default_factory=lambda: {
+        "world_danger": 0.3,       # 世界是危险的
+        "abandonment": 0.3,        # 我总会被抛弃
+        "mistrust": 0.3,           # 人不值得信任
+        "helplessness": 0.2,       # 我无能为力
+        "support_available": 0.4,  # 有人会帮我
+    })
+
     # --- physiology ---
     energy: float = 80.0
     sleep_debt: float = 0.0            # hours
+    phase: float = 0.0                 # circadian phase 0-24h (updated per tick)
+
+    # --- learning (PVLV-lite RPE + HTM-lite prediction error) ---
+    reward_expectation: float = 0.5    # expected valence of the world 0-1
+    rpe: float = 0.0                   # last reward prediction error
+    prediction_error: float = 0.0      # event-sequence surprise 0-1
+    last_event_type: str = ""
 
     # --- time ---
     t: float = 0.0                     # simulated seconds
@@ -56,13 +79,21 @@ class State:
         """Relaxation dynamics (WASABI + ALMA), spec §3.1 step 1."""
         p, a, d = self.pad
         mp, ma, md = self.mood_pad
-        # emotion -> mood baseline (slow: emotion lasts minutes, ~6%/s)
+        # WASABI: secondary (cognitive) emotions relax slower; MemoryBank:
+        # emotion decay shares the same time base as the forgetting curve
+        mod = self.emotion_decay_mod
+        k = min(1.0, self.decay_lambda * 16 * dt)   # 0.008/s at default
         # so a 60s tick only decays ~48% of the shock instead of erasing it
         self.pad = (
-            _clamp(p + (mp - p) * min(1.0, 0.008 * dt), -1, 1),
-            _clamp(a + (ma - a) * min(1.0, 0.010 * dt), -1, 1),
-            _clamp(d + (md - d) * min(1.0, 0.006 * dt), -1, 1),
+            _clamp(p + (mp - p) * k * mod, -1, 1),
+            _clamp(a + (ma - a) * k * 1.25 * mod, -1, 1),
+            _clamp(d + (md - d) * k * 0.75 * mod, -1, 1),
         )
+        # banked anger digests slowly; cognitive depth fades back to 1.0;
+        # prediction error (htm-lite surprise) decays over time
+        self.suppressed_anger = _clamp(self.suppressed_anger - 0.0006 * dt, 0, 1)
+        self.emotion_decay_mod = _clamp(self.emotion_decay_mod + 0.0002 * dt, 0.5, 1.0)
+        self.prediction_error = _clamp(self.prediction_error - 0.001 * dt, 0, 1)
         # mood -> personality attractor (very slow, hours)
         ap, aa, ad = persona.mood_attractor()
         k = min(1.0, 0.0005 * dt)
