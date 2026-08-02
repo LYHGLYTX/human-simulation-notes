@@ -18,12 +18,13 @@ def apply_shock(appr: dict, persona: Persona, state: State, rng: random.Random |
     impact *= (1.0 + persona.neuroticism * 0.5)
     impact *= (0.9 + rng.uniform(0, 0.2))
 
-    # mundane channel: low-valence, low-relevance interaction (chitchat,
+    # mundane channel: neutral-type, low-intensity interaction (chitchat,
     # small talk) is resource-MAINTAINING, not depleting (COR: social
-    # interaction is a resource; mundane contact maintains bonds). It still
-    # costs a little self-control (conversation needs monitoring) but must
-    # not drive a relaxed chat toward a crash.
-    if abs(appr["valence"]) < 0.15 and appr["goal_relevance"] < 0.35:
+    # interaction is a resource; mundane contact maintains bonds). Type-based
+    # gate is robust to LLM valence drift (LLMs rate greetings mildly
+    # positive ~0.5, which after mixing lands ~0.2 — inside the gate).
+    if (appr["event_type"] == "neutral" and abs(appr["valence"]) < 0.3
+            and appr["goal_relevance"] < 0.45):
         mild = impact * 0.15
         state.stress = clamp(state.stress + mild * 4, 0, 100)
         state.resources = clamp(state.resources + mild * 10, 0, 100)

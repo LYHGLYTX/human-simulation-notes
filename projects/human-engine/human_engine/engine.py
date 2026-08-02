@@ -203,9 +203,11 @@ class Engine:
         strength = emotion.apply_appraisal(a, self.persona, s)
 
         # PVLV-lite reward learning: valence outcome vs expectation (RPE).
-        # Neutral events carry NO reward signal (a chat is not a loss)
+        # Neutral events carry NO reward signal (a chat is not a loss).
+        # Gate by type: LLM-mixed valence drifts ~0.2 for chitchat, so use
+        # a generous threshold instead of a tight 0.15
         v = a["valence"]
-        if abs(v) < 0.15:
+        if a["event_type"] == "neutral" and abs(v) < 0.3:
             s.rpe = 0.0
         else:
             s.rpe = max(0.0, v) - s.reward_expectation
