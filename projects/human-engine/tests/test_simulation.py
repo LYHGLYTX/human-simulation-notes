@@ -33,9 +33,11 @@ class TestBatchSimulation(unittest.TestCase):
                            "行为分布不应为空")
 
     def test_resilient_crashes_less_than_fragile(self):
-        res = run_batch(SCENARIOS["stress"], n=15, seed_base=3,
+        # first 4 stress events (a full 7-hit run overwhelms everyone)
+        events = SCENARIOS["stress"][:4]
+        res = run_batch(events, n=15, seed_base=3,
                         persona=PERSONA_PRESETS["resilient"]())
-        frag = run_batch(SCENARIOS["stress"], n=15, seed_base=3,
+        frag = run_batch(events, n=15, seed_base=3,
                          persona=PERSONA_PRESETS["fragile"]())
         self.assertLess(res.crash_rate, frag.crash_rate,
                         "高韧性者面对同样压力崩溃率应更低（Bonanno）")

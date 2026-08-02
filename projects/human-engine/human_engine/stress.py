@@ -18,6 +18,19 @@ def apply_shock(appr: dict, persona: Persona, state: State, rng: random.Random |
     impact *= (1.0 + persona.neuroticism * 0.5)
     impact *= (0.9 + rng.uniform(0, 0.2))
 
+    # mundane channel: low-valence, low-relevance interaction (chitchat,
+    # small talk) is resource-MAINTAINING, not depleting (COR: social
+    # interaction is a resource; mundane contact maintains bonds). It still
+    # costs a little self-control (conversation needs monitoring) but must
+    # not drive a relaxed chat toward a crash.
+    if abs(appr["valence"]) < 0.15 and appr["goal_relevance"] < 0.35:
+        mild = impact * 0.15
+        state.stress = clamp(state.stress + mild * 4, 0, 100)
+        state.resources = clamp(state.resources + mild * 10, 0, 100)
+        state.self_control = clamp(state.self_control - mild * 6, 0, 100)
+        check_crash(persona, state)
+        return
+
     state.stress = clamp(state.stress + impact * 12, 0, 100)
     state.resources = clamp(state.resources - impact * 8, 0, 100)
     state.self_control = clamp(state.self_control - impact * 10, 0, 100)

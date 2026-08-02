@@ -202,14 +202,18 @@ class Engine:
         # 3. emotion shock
         strength = emotion.apply_appraisal(a, self.persona, s)
 
-        # PVLV-lite reward learning: valence outcome vs expectation (RPE)
-        outcome = max(0.0, a["valence"])
-        s.rpe = outcome - s.reward_expectation
-        s.reward_expectation = clamp(s.reward_expectation + 0.1 * s.rpe, 0, 1)
-        # dopamine-like: positive RPE lifts the mood baseline, negative sags it
-        if abs(s.rpe) > 0.15:
-            mp, ma, md = s.mood_pad
-            s.mood_pad = (clamp(mp + s.rpe * 0.03, -1, 1), ma, md)
+        # PVLV-lite reward learning: valence outcome vs expectation (RPE).
+        # Neutral events carry NO reward signal (a chat is not a loss)
+        v = a["valence"]
+        if abs(v) < 0.15:
+            s.rpe = 0.0
+        else:
+            s.rpe = max(0.0, v) - s.reward_expectation
+            s.reward_expectation = clamp(s.reward_expectation + 0.1 * s.rpe, 0, 1)
+            # dopamine-like: positive RPE lifts the mood baseline, negative sags it
+            if abs(s.rpe) > 0.15:
+                mp, ma, md = s.mood_pad
+                s.mood_pad = (clamp(mp + s.rpe * 0.03, -1, 1), ma, md)
 
         # HTM-lite prediction error: surprising event sequences raise
         # arousal/attention (novelty signal)

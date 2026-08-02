@@ -108,6 +108,37 @@ class TestAutopilot(unittest.TestCase):
                         "深夜+困倦应触发自动睡眠")
 
 
+class TestMundaneChannel(unittest.TestCase):
+    """Chitchat must not deplete the person (regression: it used to drive
+    stress/resources/self-control down every turn — a relaxed chat is
+    resource-maintaining, not depleting)."""
+
+    def test_chitchat_does_not_deplete(self):
+        from human_engine.llm import MockLLM
+        e = Engine(seed=11, llm=MockLLM())
+        s0 = (e.state.stress, e.state.resources, e.state.self_control)
+        for msg in ["你好啊", "你在做什么呢", "今天天气不错"]:
+            e.tick(60)
+            e.handle_event(msg)
+        s1 = (e.state.stress, e.state.resources, e.state.self_control)
+        self.assertLessEqual(s1[0], s0[0] + 3, "闲聊不应显著抬升应激")
+        self.assertGreaterEqual(s1[1], s0[1], "闲聊不应耗竭资源")
+
+    def test_neutral_chat_has_no_negative_rpe(self):
+        from human_engine.llm import MockLLM
+        e = Engine(seed=13, llm=MockLLM())
+        e.handle_event("随便聊聊")
+        self.assertAlmostEqual(e.state.rpe, 0.0, places=3,
+                               "中性事件不应产生负奖赏预测误差")
+
+    def test_negative_events_still_hit(self):
+        from human_engine.llm import MockLLM
+        e = Engine(seed=12, llm=MockLLM())
+        s0 = e.state.stress
+        e.handle_event("你被当众羞辱了")
+        self.assertGreater(e.state.stress, s0 + 10, "负面事件冲击必须保留")
+
+
 class TestIdentity(unittest.TestCase):
     def test_summary_has_identity(self):
         p = default_persona()
